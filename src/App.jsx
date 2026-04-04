@@ -65,21 +65,21 @@ const themes = [
 const packages = [
   {
     name: 'Basic',
-    price: 'Rp149.000',
+    price: 'Rp50.000',
     description: 'Untuk pasangan yang ingin mulai cepat dengan tampilan tetap elegan.',
     features: ['1 tema pilihan', 'RSVP dasar', 'Countdown acara', 'Share link WhatsApp'],
     featured: false,
   },
   {
     name: 'Premium',
-    price: 'Rp299.000',
+    price: 'Rp80.000',
     description: 'Paket paling populer untuk undangan yang lebih personal dan lengkap.',
     features: ['3 tema premium', 'Galeri foto', 'Musik latar', 'Buku tamu digital', 'Highlight acara'],
     featured: true,
   },
   {
     name: 'Exclusive',
-    price: 'Rp499.000',
+    price: 'Rp100.000',
     description: 'Dirancang untuk pengalaman undangan digital yang lebih mewah dan fleksibel.',
     features: ['Tema custom', 'Custom domain', 'RSVP lanjutan', 'Story timeline', 'Prioritas revisi'],
     featured: false,
