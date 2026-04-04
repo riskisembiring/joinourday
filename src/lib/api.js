@@ -1,8 +1,8 @@
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 
 const endpoints = {
-  login: import.meta.env.VITE_API_LOGIN_ENDPOINT || '/api/testimonials',
-  register: import.meta.env.VITE_API_REGISTER_ENDPOINT || '/api/testimonials',
+  login: import.meta.env.VITE_API_LOGIN_ENDPOINT || '/api/auth/login',
+  register: import.meta.env.VITE_API_REGISTER_ENDPOINT || '/api/auth/register',
   testimonials: import.meta.env.VITE_API_TESTIMONIALS_ENDPOINT || '/api/testimonials',
 }
 
