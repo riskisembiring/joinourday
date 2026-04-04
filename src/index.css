@@ -1,0 +1,114 @@
+:root {
+  --bg: #fdf7f1;
+  --bg-strong: #fffdf9;
+  --surface: rgba(255, 252, 249, 0.88);
+  --text-heading: #34261d;
+  --text-body: #5f4f45;
+  --text-soft: #7b6a5f;
+  --accent: #b18762;
+  --accent-deep: #8a5f3b;
+  --line: rgba(182, 151, 124, 0.2);
+  --font-serif: 'Cormorant Garamond', 'Iowan Old Style', 'Palatino Linotype', serif;
+  --font-sans:
+    'Avenir Next', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  font-weight: 400;
+  color: var(--text-body);
+  background:
+    radial-gradient(circle at top, rgba(255, 245, 236, 0.86), transparent 30%),
+    linear-gradient(180deg, #fffdf9, var(--bg));
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  color: var(--text-body);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 249, 0.98), rgba(250, 241, 233, 0.96));
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+  background-size: 120px 120px;
+  mask-image: radial-gradient(circle at center, black, transparent 78%);
+  opacity: 0.3;
+}
+
+a,
+button,
+input {
+  font: inherit;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin-top: 0;
+}
+
+h1,
+h2,
+h3 {
+  color: var(--text-heading);
+  font-family: var(--font-serif);
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+h1 {
+  font-size: clamp(3rem, 6vw, 5.4rem);
+  letter-spacing: -0.04em;
+  margin: 20px 0 18px;
+}
+
+h2 {
+  font-size: clamp(2rem, 3.2vw, 3.2rem);
+  letter-spacing: -0.03em;
+  margin-bottom: 0;
+}
+
+h3 {
+  font-size: 1.5rem;
+}
+
+p {
+  font-size: 1rem;
+}
+
+#root {
+  width: 100%;
+  margin: 0 auto;
+}
+
+@media (max-width: 720px) {
+  #root {
+    width: 100%;
+  }
+}
