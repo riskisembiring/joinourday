@@ -125,6 +125,7 @@ const whatsappLink =
 const demoSectionIds = ['demo-cover', 'demo-event', 'demo-gallery', 'demo-gift']
 const demoMusicEmbedUrl =
   'https://www.youtube.com/embed/5d3m0fOEWZs?autoplay=1&controls=0&loop=1&playlist=5d3m0fOEWZs&playsinline=1&rel=0'
+const demoMusicWatchUrl = 'https://www.youtube.com/watch?v=5d3m0fOEWZs'
 
 const createInitials = (name) =>
   name
@@ -213,7 +214,9 @@ function DemoPage({ theme }) {
   const [isMusicPlaying, setIsMusicPlaying] = useState(false)
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true)
   const [activeSection, setActiveSection] = useState('demo-cover')
+  const [showMusicFallback, setShowMusicFallback] = useState(false)
   const autoScrollRef = useRef(null)
+  const autoScrollLastFrameRef = useRef(null)
   const galleryItems = [
     {
       id: 'gallery-cover',
@@ -243,9 +246,11 @@ function DemoPage({ theme }) {
 
   const stopAutoScroll = () => {
     if (autoScrollRef.current) {
-      window.clearInterval(autoScrollRef.current)
+      window.cancelAnimationFrame(autoScrollRef.current)
       autoScrollRef.current = null
     }
+
+    autoScrollLastFrameRef.current = null
   }
 
   useEffect(() => {
@@ -255,17 +260,36 @@ function DemoPage({ theme }) {
     }
 
     if (isAutoScrollEnabled) {
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      const scrollingElement = document.scrollingElement || document.documentElement
+
+      window.scrollTo({ top: 0, behavior: 'auto' })
       stopAutoScroll()
-      autoScrollRef.current = window.setInterval(() => {
-        const maxScroll = document.documentElement.scrollHeight - window.innerHeight
-        if (window.scrollY >= maxScroll - 4) {
+
+      const step = (timestamp) => {
+        if (autoScrollLastFrameRef.current === null) {
+          autoScrollLastFrameRef.current = timestamp
+        }
+
+        const elapsed = timestamp - autoScrollLastFrameRef.current
+        autoScrollLastFrameRef.current = timestamp
+
+        const maxScroll = scrollingElement.scrollHeight - window.innerHeight
+
+        if (scrollingElement.scrollTop >= maxScroll - 4) {
           stopAutoScroll()
           return
         }
 
-        window.scrollBy({ top: 1, behavior: 'auto' })
-      }, 22)
+        const nextScrollTop = Math.min(
+          scrollingElement.scrollTop + (elapsed / 1000) * 42,
+          maxScroll,
+        )
+
+        window.scrollTo({ top: nextScrollTop, behavior: 'auto' })
+        autoScrollRef.current = window.requestAnimationFrame(step)
+      }
+
+      autoScrollRef.current = window.requestAnimationFrame(step)
     } else {
       stopAutoScroll()
     }
@@ -307,6 +331,27 @@ function DemoPage({ theme }) {
   }, [isInvitationOpened])
 
   useEffect(() => {
+    if (!isInvitationOpened || !isAutoScrollEnabled) {
+      return undefined
+    }
+
+    const stopFromUserInteraction = () => {
+      stopAutoScroll()
+      setIsAutoScrollEnabled(false)
+    }
+
+    window.addEventListener('touchstart', stopFromUserInteraction, { passive: true })
+    window.addEventListener('wheel', stopFromUserInteraction, { passive: true })
+    window.addEventListener('pointerdown', stopFromUserInteraction, { passive: true })
+
+    return () => {
+      window.removeEventListener('touchstart', stopFromUserInteraction)
+      window.removeEventListener('wheel', stopFromUserInteraction)
+      window.removeEventListener('pointerdown', stopFromUserInteraction)
+    }
+  }, [isAutoScrollEnabled, isInvitationOpened])
+
+  useEffect(() => {
     if (!isInvitationOpened) {
       return undefined
     }
@@ -343,7 +388,7 @@ function DemoPage({ theme }) {
   useEffect(() => {
     return () => {
       if (autoScrollRef.current) {
-        window.clearInterval(autoScrollRef.current)
+        window.cancelAnimationFrame(autoScrollRef.current)
       }
     }
   }, [])
@@ -351,11 +396,13 @@ function DemoPage({ theme }) {
   const openInvitation = () => {
     setIsInvitationOpened(true)
     setIsMusicPlaying(true)
+    setShowMusicFallback(window.matchMedia('(pointer: coarse)').matches)
   }
 
   const goToSection = (sectionId) => {
     if (isAutoScrollEnabled) {
       stopAutoScroll()
+      setIsAutoScrollEnabled(false)
     }
     const section = document.getElementById(sectionId)
     if (section) {
@@ -410,6 +457,17 @@ function DemoPage({ theme }) {
               allow="autoplay; encrypted-media"
             />
           </div>
+        ) : null}
+
+        {isMusicPlaying && showMusicFallback ? (
+          <a
+            className="demo-music-fallback"
+            href={demoMusicWatchUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Browser mobile sering memblokir autoplay YouTube. Ketuk untuk memutar musik demo.
+          </a>
         ) : null}
 
         <div className="demo-phone-frame">
