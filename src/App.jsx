@@ -3,6 +3,7 @@ import logoMark from './assets/HurufJ.png'
 import demoImageOne from './assets/demo/prewd1.jpg'
 import demoImageTwo from './assets/demo/prewd2.jpg'
 import demoImageThree from './assets/demo/prewd3.jpg'
+import demoMusicFile from './audio/Kala Cinta Menggoda (Chrisye Cover) - Forte Entertainment [5d3m0fOEWZs].mp3'
 import {
   createTestimonial,
   fetchTestimonials,
@@ -123,8 +124,6 @@ const whatsappLink =
   'https://wa.me/6285270106090?text=%5Bka%5D%20Halo%20joinourday%2C%20saya%20mau%20buat%20undangan%20nih%2C%20mau%20tanya%20dong%20...'
 
 const demoSectionIds = ['demo-cover', 'demo-event', 'demo-gallery', 'demo-gift']
-const demoMusicEmbedUrl =
-  'https://www.youtube.com/embed/5d3m0fOEWZs?autoplay=1&controls=0&loop=1&playlist=5d3m0fOEWZs&playsinline=1&rel=0'
 
 const createInitials = (name) =>
   name
@@ -214,8 +213,7 @@ function DemoPage({ theme }) {
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true)
   const [activeSection, setActiveSection] = useState('demo-cover')
   const autoScrollRef = useRef(null)
-  const autoScrollLastFrameRef = useRef(null)
-  const isCoarsePointerRef = useRef(false)
+  const audioRef = useRef(null)
   const galleryItems = [
     {
       id: 'gallery-cover',
@@ -245,16 +243,10 @@ function DemoPage({ theme }) {
 
   const stopAutoScroll = () => {
     if (autoScrollRef.current) {
-      window.cancelAnimationFrame(autoScrollRef.current)
+      window.clearInterval(autoScrollRef.current)
       autoScrollRef.current = null
     }
-
-    autoScrollLastFrameRef.current = null
   }
-
-  useEffect(() => {
-    isCoarsePointerRef.current = window.matchMedia('(pointer: coarse)').matches
-  }, [])
 
   useEffect(() => {
     if (!isInvitationOpened) {
@@ -263,36 +255,17 @@ function DemoPage({ theme }) {
     }
 
     if (isAutoScrollEnabled) {
-      const scrollingElement = document.scrollingElement || document.documentElement
-
-      window.scrollTo({ top: 0, behavior: 'auto' })
+      window.scrollTo({ top: 0, behavior: 'smooth' })
       stopAutoScroll()
-
-      const step = (timestamp) => {
-        if (autoScrollLastFrameRef.current === null) {
-          autoScrollLastFrameRef.current = timestamp
-        }
-
-        const elapsed = timestamp - autoScrollLastFrameRef.current
-        autoScrollLastFrameRef.current = timestamp
-
-        const maxScroll = scrollingElement.scrollHeight - window.innerHeight
-
-        if (scrollingElement.scrollTop >= maxScroll - 4) {
+      autoScrollRef.current = window.setInterval(() => {
+        const maxScroll = document.documentElement.scrollHeight - window.innerHeight
+        if (window.scrollY >= maxScroll - 4) {
           stopAutoScroll()
           return
         }
 
-        const nextScrollTop = Math.min(
-          scrollingElement.scrollTop + (elapsed / 1000) * 42,
-          maxScroll,
-        )
-
-        window.scrollTo({ top: nextScrollTop, behavior: 'auto' })
-        autoScrollRef.current = window.requestAnimationFrame(step)
-      }
-
-      autoScrollRef.current = window.requestAnimationFrame(step)
+        window.scrollBy({ top: 1, behavior: 'auto' })
+      }, 22)
     } else {
       stopAutoScroll()
     }
@@ -368,16 +341,42 @@ function DemoPage({ theme }) {
   }, [isInvitationOpened])
 
   useEffect(() => {
+    const audio = audioRef.current
+
+    if (!audio) {
+      return undefined
+    }
+
+    if (isMusicPlaying) {
+      const playPromise = audio.play()
+
+      if (playPromise?.catch) {
+        playPromise.catch(() => {
+          setIsMusicPlaying(false)
+        })
+      }
+    } else {
+      audio.pause()
+    }
+
+    return undefined
+  }, [isMusicPlaying])
+
+  useEffect(() => {
     return () => {
+      if (audioRef.current) {
+        audioRef.current.pause()
+      }
+
       if (autoScrollRef.current) {
-        window.cancelAnimationFrame(autoScrollRef.current)
+        window.clearInterval(autoScrollRef.current)
       }
     }
   }, [])
 
   const openInvitation = () => {
     setIsInvitationOpened(true)
-    setIsMusicPlaying(!isCoarsePointerRef.current)
+    setIsMusicPlaying(true)
   }
 
   const goToSection = (sectionId) => {
@@ -430,15 +429,9 @@ function DemoPage({ theme }) {
       ) : null}
 
       <main className={`demo-layout${isInvitationOpened ? ' demo-layout-visible' : ''}`}>
-        {isMusicPlaying ? (
-          <div className="demo-youtube-audio" aria-hidden="true">
-            <iframe
-              src={demoMusicEmbedUrl}
-              title="Kala Cinta Menggoda (Chrisye Cover) - Forte Entertainment"
-              allow="autoplay; encrypted-media"
-            />
-          </div>
-        ) : null}
+        <div className="demo-youtube-audio" aria-hidden="true">
+          <audio ref={audioRef} src={demoMusicFile} loop preload="auto" />
+        </div>
 
         <div className="demo-phone-frame">
           <section
