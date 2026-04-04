@@ -125,7 +125,6 @@ const whatsappLink =
 const demoSectionIds = ['demo-cover', 'demo-event', 'demo-gallery', 'demo-gift']
 const demoMusicEmbedUrl =
   'https://www.youtube.com/embed/5d3m0fOEWZs?autoplay=1&controls=0&loop=1&playlist=5d3m0fOEWZs&playsinline=1&rel=0'
-const demoMusicWatchUrl = 'https://www.youtube.com/watch?v=5d3m0fOEWZs'
 
 const createInitials = (name) =>
   name
@@ -214,9 +213,9 @@ function DemoPage({ theme }) {
   const [isMusicPlaying, setIsMusicPlaying] = useState(false)
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true)
   const [activeSection, setActiveSection] = useState('demo-cover')
-  const [showMusicFallback, setShowMusicFallback] = useState(false)
   const autoScrollRef = useRef(null)
   const autoScrollLastFrameRef = useRef(null)
+  const isCoarsePointerRef = useRef(false)
   const galleryItems = [
     {
       id: 'gallery-cover',
@@ -252,6 +251,10 @@ function DemoPage({ theme }) {
 
     autoScrollLastFrameRef.current = null
   }
+
+  useEffect(() => {
+    isCoarsePointerRef.current = window.matchMedia('(pointer: coarse)').matches
+  }, [])
 
   useEffect(() => {
     if (!isInvitationOpened) {
@@ -331,27 +334,6 @@ function DemoPage({ theme }) {
   }, [isInvitationOpened])
 
   useEffect(() => {
-    if (!isInvitationOpened || !isAutoScrollEnabled) {
-      return undefined
-    }
-
-    const stopFromUserInteraction = () => {
-      stopAutoScroll()
-      setIsAutoScrollEnabled(false)
-    }
-
-    window.addEventListener('touchstart', stopFromUserInteraction, { passive: true })
-    window.addEventListener('wheel', stopFromUserInteraction, { passive: true })
-    window.addEventListener('pointerdown', stopFromUserInteraction, { passive: true })
-
-    return () => {
-      window.removeEventListener('touchstart', stopFromUserInteraction)
-      window.removeEventListener('wheel', stopFromUserInteraction)
-      window.removeEventListener('pointerdown', stopFromUserInteraction)
-    }
-  }, [isAutoScrollEnabled, isInvitationOpened])
-
-  useEffect(() => {
     if (!isInvitationOpened) {
       return undefined
     }
@@ -395,8 +377,7 @@ function DemoPage({ theme }) {
 
   const openInvitation = () => {
     setIsInvitationOpened(true)
-    setIsMusicPlaying(true)
-    setShowMusicFallback(window.matchMedia('(pointer: coarse)').matches)
+    setIsMusicPlaying(!isCoarsePointerRef.current)
   }
 
   const goToSection = (sectionId) => {
@@ -457,17 +438,6 @@ function DemoPage({ theme }) {
               allow="autoplay; encrypted-media"
             />
           </div>
-        ) : null}
-
-        {isMusicPlaying && showMusicFallback ? (
-          <a
-            className="demo-music-fallback"
-            href={demoMusicWatchUrl}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Browser mobile sering memblokir autoplay YouTube. Ketuk untuk memutar musik demo.
-          </a>
         ) : null}
 
         <div className="demo-phone-frame">

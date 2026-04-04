@@ -1227,23 +1227,6 @@
   border: 0;
 }
 
-.demo-music-fallback {
-  position: fixed;
-  top: 16px;
-  left: 50%;
-  z-index: 25;
-  width: min(calc(100% - 28px), 430px);
-  padding: 12px 16px;
-  border-radius: 18px;
-  transform: translateX(-50%);
-  background: rgba(41, 19, 11, 0.88);
-  border: 1px solid rgba(255, 231, 196, 0.18);
-  color: #fff2de;
-  text-decoration: none;
-  text-align: center;
-  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.24);
-}
-
 .demo-phone-frame {
   position: relative;
   width: min(100%, 430px);
@@ -1988,12 +1971,6 @@
   .demo-bottom-toolbar {
     bottom: 12px;
     width: calc(100% - 20px);
-  }
-
-  .demo-music-fallback {
-    top: 12px;
-    width: calc(100% - 20px);
-    font-size: 0.88rem;
   }
 
   .floating-whatsapp {
