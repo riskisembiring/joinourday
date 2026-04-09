@@ -5,11 +5,16 @@ import demoImageTwo from './assets/demo/prewd2.jpg'
 import demoImageThree from './assets/demo/prewd3.jpg'
 import demoMusicFile from './audio/Kala Cinta Menggoda (Chrisye Cover) - Forte Entertainment [5d3m0fOEWZs].mp3'
 import {
+  createMidtransTransaction,
   createTestimonial,
+  fetchAdminPaymentHistory,
+  fetchAdminUserDetail,
+  fetchAdminUsers,
   fetchTestimonials,
   loginUser,
   registerUser,
 } from './lib/api'
+import { writeAuthLog, writePaymentLog } from './lib/adminLogs'
 import './App.css'
 
 const navItems = [
@@ -66,21 +71,27 @@ const themes = [
 const packages = [
   {
     name: 'Basic',
+    code: 'basic',
     price: 'Rp50.000',
+    amount: 50000,
     description: 'Untuk pasangan yang ingin mulai cepat dengan tampilan tetap elegan.',
     features: ['1 tema pilihan', 'RSVP dasar', 'Countdown acara', 'Share link WhatsApp'],
     featured: false,
   },
   {
     name: 'Premium',
+    code: 'premium',
     price: 'Rp80.000',
+    amount: 80000,
     description: 'Paket paling populer untuk undangan yang lebih personal dan lengkap.',
     features: ['3 tema premium', 'Galeri foto', 'Musik latar', 'Buku tamu digital', 'Highlight acara'],
     featured: true,
   },
   {
     name: 'Exclusive',
+    code: 'exclusive',
     price: 'Rp100.000',
+    amount: 100000,
     description: 'Dirancang untuk pengalaman undangan digital yang lebih mewah dan fleksibel.',
     features: ['Tema custom', 'Custom domain', 'RSVP lanjutan', 'Story timeline', 'Prioritas revisi'],
     featured: false,
@@ -202,9 +213,165 @@ const getAuthUser = (payload, fallbackName, fallbackEmail) => {
     fallbackEmail
 
   return {
+    id: user?.id ?? user?._id ?? user?.userId ?? user?.uid ?? payload?.userId ?? '',
     name,
     email,
+    role: user?.role ?? user?.user_type ?? payload?.role ?? '',
+    token:
+      payload?.token ??
+      payload?.accessToken ??
+      payload?.access_token ??
+      payload?.data?.token ??
+      payload?.data?.accessToken ??
+      payload?.data?.access_token ??
+      payload?.data?.data?.token ??
+      payload?.data?.data?.accessToken ??
+      payload?.data?.data?.access_token ??
+      payload?.user?.token ??
+      payload?.user?.accessToken ??
+      payload?.user?.access_token ??
+      payload?.data?.user?.token ??
+      payload?.data?.user?.accessToken ??
+      payload?.data?.user?.access_token ??
+      payload?.tokens?.accessToken ??
+      payload?.tokens?.access_token ??
+      payload?.data?.tokens?.accessToken ??
+      payload?.data?.tokens?.access_token ??
+      '',
   }
+}
+
+const buildOrderId = (packageCode) =>
+  `JOD-${packageCode.toUpperCase()}-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+
+const getPaymentTransaction = (payload) =>
+  payload?.transaction ?? payload?.data?.transaction ?? payload?.data ?? payload
+
+const formatDateTime = (value) => {
+  if (!value) {
+    return '-'
+  }
+
+  const date =
+    typeof value?.toDate === 'function'
+      ? value.toDate()
+      : value instanceof Date
+        ? value
+        : new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return '-'
+  }
+
+  return new Intl.DateTimeFormat('id-ID', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date)
+}
+
+const swallowLogError = (scope) => (error) => {
+  console.error(`Gagal mencatat ${scope}:`, error)
+}
+
+const normalizeCollectionPayload = (payload, keys = []) => {
+  if (Array.isArray(payload)) {
+    return payload
+  }
+
+  for (const key of keys) {
+    if (Array.isArray(payload?.[key])) {
+      return payload[key]
+    }
+
+    if (Array.isArray(payload?.data?.[key])) {
+      return payload.data[key]
+    }
+  }
+
+  if (Array.isArray(payload?.data)) {
+    return payload.data
+  }
+
+  return []
+}
+
+const normalizeAdminUsers = (payload) =>
+  normalizeCollectionPayload(payload, ['users', 'results']).map((item, index) => ({
+    id: item?.id ?? item?._id ?? item?.userId ?? item?.uid ?? `user-${index}`,
+    name: item?.nama ?? item?.name ?? item?.fullName ?? '-',
+    email: item?.email ?? '-',
+    role: item?.role ?? item?.user_type ?? '-',
+    createdAt: item?.createdAt ?? item?.created_at ?? item?.registeredAt ?? '',
+    updatedAt: item?.updatedAt ?? item?.updated_at ?? '',
+    lastLoginAt: item?.lastLoginAt ?? item?.last_login_at ?? item?.loggedInAt ?? '',
+  }))
+
+const normalizeAdminPayments = (payload) =>
+  normalizeCollectionPayload(payload, ['payments', 'transactions', 'results', 'history']).map(
+    (item, index) => ({
+      id: item?.id ?? item?._id ?? item?.orderId ?? `payment-${index}`,
+      orderId: item?.orderId ?? item?.order_id ?? '-',
+      userId: item?.userId ?? item?.user_id ?? '',
+      loggedInUser: item?.loggedInUser ?? item?.userEmail ?? item?.email ?? '-',
+      customerName:
+        item?.customerName ??
+        item?.customer_name ??
+        item?.customerDetails?.first_name ??
+        item?.customer_details?.first_name ??
+        item?.name ??
+        '',
+      customerEmail: item?.customerEmail ?? item?.customer_email ?? item?.email ?? '',
+      packageName:
+        item?.packageName ??
+        item?.package_name ??
+        item?.package ??
+        item?.packageCode ??
+        item?.package_code ??
+        item?.itemDetails?.[0]?.name ??
+        item?.item_details?.[0]?.name ??
+        '-',
+      amount: Number(item?.amount ?? item?.grossAmount ?? item?.gross_amount ?? 0),
+      paymentStatus:
+        item?.paymentStatus ?? item?.status ?? item?.transactionStatus ?? item?.transaction_status ?? '-',
+      createdAt: item?.createdAt ?? item?.created_at ?? '',
+      updatedAt: item?.updatedAt ?? item?.updated_at ?? '',
+    }),
+  )
+
+const loadMidtransSnap = () => {
+  if (window.snap) {
+    return Promise.resolve(window.snap)
+  }
+
+  const clientKey = import.meta.env.VITE_MIDTRANS_CLIENT_KEY
+
+  if (!clientKey) {
+    return Promise.reject(new Error('VITE_MIDTRANS_CLIENT_KEY belum diatur.'))
+  }
+
+  const existingScript = document.querySelector('script[data-midtrans-snap="true"]')
+
+  if (existingScript) {
+    return new Promise((resolve, reject) => {
+      existingScript.addEventListener('load', () => resolve(window.snap), { once: true })
+      existingScript.addEventListener(
+        'error',
+        () => reject(new Error('Gagal memuat Midtrans Snap.')),
+        { once: true },
+      )
+    })
+  }
+
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script')
+    script.src =
+      import.meta.env.VITE_MIDTRANS_SNAP_URL || 'https://app.sandbox.midtrans.com/snap/snap.js'
+    script.dataset.midtransSnap = 'true'
+    script.dataset.clientKey = clientKey
+    script.onload = () => resolve(window.snap)
+    script.onerror = () => reject(new Error('Gagal memuat Midtrans Snap.'))
+    document.body.appendChild(script)
+  })
 }
 
 function DemoPage({ theme }) {
@@ -363,9 +530,11 @@ function DemoPage({ theme }) {
   }, [isMusicPlaying])
 
   useEffect(() => {
+    const audio = audioRef.current
+
     return () => {
-      if (audioRef.current) {
-        audioRef.current.pause()
+      if (audio) {
+        audio.pause()
       }
 
       if (autoScrollRef.current) {
@@ -754,6 +923,49 @@ function LandingPage({
     error: '',
     success: '',
   })
+  const [selectedPackageCode, setSelectedPackageCode] = useState(() => {
+    const featuredPackage = packages.find((item) => item.featured)
+    return featuredPackage?.code || packages[0]?.code || ''
+  })
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
+  const [paymentForm, setPaymentForm] = useState(() => ({
+    customerName: authUser?.name || '',
+    email: authUser?.email || '',
+    phone: '',
+    notes: '',
+  }))
+  const [paymentStatus, setPaymentStatus] = useState({
+    submitting: false,
+    checking: false,
+    error: '',
+    success: '',
+  })
+
+  const selectedPackage = packages.find((item) => item.code === selectedPackageCode) ?? packages[0]
+
+  useEffect(() => {
+    if (!isPaymentModalOpen) {
+      return undefined
+    }
+
+    const { body } = document
+    const previousOverflow = body.style.overflow
+
+    body.style.overflow = 'hidden'
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setIsPaymentModalOpen(false)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isPaymentModalOpen])
 
   useEffect(() => {
     const loadTestimonials = async () => {
@@ -872,16 +1084,55 @@ function LandingPage({
     setAuthForm((current) => ({ ...current, [name]: value }))
   }
 
+  const handlePaymentInputChange = (event) => {
+    const { name, value } = event.target
+    setPaymentForm((current) => ({ ...current, [name]: value }))
+  }
+
+  const handleSelectPackage = (packageCode) => {
+    setSelectedPackageCode(packageCode)
+
+    if (!authUser) {
+      setIsPaymentModalOpen(false)
+      setActiveTab('login')
+      setAuthStatus({
+        submitting: false,
+        error: 'Silakan login terlebih dahulu sebelum memilih paket.',
+        success: '',
+      })
+      document.getElementById('auth')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      return
+    }
+
+    setIsPaymentModalOpen(true)
+  }
+
   const handleLogout = () => {
+    const previousUser = authUser
+
     window.localStorage.removeItem('joinourday-auth-user')
     setAuthUser(null)
     setAuthIdentity('')
+    setPaymentForm((current) => ({
+      ...current,
+      customerName: '',
+      email: '',
+    }))
     setAuthStatus({
       submitting: false,
       error: '',
       success: 'Anda sudah logout.',
     })
     setActiveTab('login')
+
+    if (previousUser?.email) {
+      writeAuthLog({
+        type: 'logout',
+        userEmail: previousUser.email,
+        userName: previousUser.name || '',
+        loggedInAt: previousUser.loggedInAt || null,
+      }).catch(swallowLogError('logout'))
+    }
   }
 
   const handleTestimonialSubmit = async (event) => {
@@ -999,6 +1250,11 @@ function LandingPage({
 
       window.localStorage.setItem('joinourday-auth-user', JSON.stringify(nextAuthUser))
       setAuthUser(nextAuthUser)
+      setPaymentForm((current) => ({
+        ...current,
+        customerName: current.customerName || nextAuthUser.name || '',
+        email: current.email || nextAuthUser.email || '',
+      }))
       setAuthStatus({
         submitting: false,
         error: '',
@@ -1008,12 +1264,277 @@ function LandingPage({
         ...current,
         password: '',
       }))
+
+      writeAuthLog({
+        type: 'login',
+        userEmail: nextAuthUser.email || email,
+        userName: nextAuthUser.name || '',
+        loggedInAt: nextAuthUser.loggedInAt,
+      }).catch(swallowLogError('login'))
     } catch (error) {
       setAuthStatus({
         submitting: false,
         error: error instanceof Error ? error.message : 'Autentikasi gagal.',
         success: '',
       })
+    }
+  }
+
+  const handlePaymentSubmit = async (event) => {
+    event.preventDefault()
+
+    const customerName = paymentForm.customerName.trim()
+    const email = paymentForm.email.trim()
+    const phone = paymentForm.phone.trim()
+
+    if (!selectedPackage || !customerName || !email || !phone) {
+      setPaymentStatus({
+        submitting: false,
+        checking: false,
+        error: 'Paket, nama, email, dan nomor WhatsApp wajib diisi.',
+        success: '',
+      })
+      return
+    }
+
+    const orderId = buildOrderId(selectedPackage.code)
+
+    try {
+      setPaymentStatus({
+        submitting: true,
+        checking: false,
+        error: '',
+        success: '',
+      })
+
+      const response = await createMidtransTransaction({
+        orderId,
+        order_id: orderId,
+        packageCode: selectedPackage.code,
+        packageName: selectedPackage.name,
+        amount: selectedPackage.amount,
+        grossAmount: selectedPackage.amount,
+        gross_amount: selectedPackage.amount,
+        itemDetails: [
+          {
+            id: selectedPackage.code,
+            name: selectedPackage.name,
+            price: selectedPackage.amount,
+            quantity: 1,
+          },
+        ],
+        item_details: [
+          {
+            id: selectedPackage.code,
+            name: selectedPackage.name,
+            price: selectedPackage.amount,
+            quantity: 1,
+          },
+        ],
+        transactionDetails: {
+          orderId,
+          grossAmount: selectedPackage.amount,
+        },
+        transaction_details: {
+          order_id: orderId,
+          gross_amount: selectedPackage.amount,
+        },
+        customerDetails: {
+          first_name: customerName,
+          email,
+          phone,
+        },
+        customer_details: {
+          first_name: customerName,
+          email,
+          phone,
+        },
+        metadata: {
+          notes: paymentForm.notes.trim(),
+          source: 'joinourday-web',
+          loggedInUser: authUser?.email || null,
+        },
+      })
+
+      const transaction = getPaymentTransaction(response)
+      const token = transaction?.token ?? response?.token
+      const redirectUrl = transaction?.redirectUrl ?? transaction?.redirect_url ?? response?.redirectUrl
+      const nextPayment = {
+        orderId,
+        packageName: selectedPackage.name,
+        amount: selectedPackage.amount,
+        customerName,
+        customerEmail: email,
+        customerPhone: phone,
+        loggedInUser: authUser?.email || null,
+        token: token || '',
+        redirectUrl: redirectUrl || '',
+        status: 'pending',
+      }
+
+      window.localStorage.setItem('joinourday-latest-payment', JSON.stringify(nextPayment))
+      setPaymentStatus({
+        submitting: false,
+        checking: false,
+        error: '',
+        success: `Token pembayaran berhasil dibuat untuk order ${orderId}.`,
+      })
+
+      writePaymentLog({
+        orderId,
+        type: 'token_created',
+        paymentStatus: 'pending',
+        packageCode: selectedPackage.code,
+        packageName: selectedPackage.name,
+        amount: selectedPackage.amount,
+        customerName,
+        customerEmail: email,
+        customerPhone: phone,
+        notes: paymentForm.notes.trim(),
+        loggedInUser: authUser?.email || null,
+        redirectUrl: redirectUrl || '',
+      }).catch(swallowLogError('token pembayaran'))
+
+      if (token) {
+        const snap = await loadMidtransSnap()
+
+        snap.pay(token, {
+          onSuccess: (result) => {
+            const paidPayment = {
+              ...nextPayment,
+              status: result?.transaction_status || 'settlement',
+            }
+            window.localStorage.setItem('joinourday-latest-payment', JSON.stringify(paidPayment))
+            setPaymentStatus({
+              submitting: false,
+              checking: false,
+              error: '',
+              success: 'Pembayaran berhasil diselesaikan.',
+            })
+
+            writePaymentLog({
+              orderId,
+              type: 'payment_success',
+              paymentStatus: result?.transaction_status || 'settlement',
+              fraudStatus: result?.fraud_status || '',
+              packageCode: selectedPackage.code,
+              packageName: selectedPackage.name,
+              amount: selectedPackage.amount,
+              customerName,
+              customerEmail: email,
+              customerPhone: phone,
+              loggedInUser: authUser?.email || null,
+              transactionId: result?.transaction_id || '',
+            }).catch(swallowLogError('status pembayaran sukses'))
+          },
+          onPending: (result) => {
+            const pendingPayment = {
+              ...nextPayment,
+              status: result?.transaction_status || 'pending',
+            }
+            window.localStorage.setItem('joinourday-latest-payment', JSON.stringify(pendingPayment))
+            setPaymentStatus({
+              submitting: false,
+              checking: false,
+              error: '',
+              success: 'Pembayaran masih menunggu penyelesaian.',
+            })
+
+            writePaymentLog({
+              orderId,
+              type: 'payment_pending',
+              paymentStatus: result?.transaction_status || 'pending',
+              fraudStatus: result?.fraud_status || '',
+              packageCode: selectedPackage.code,
+              packageName: selectedPackage.name,
+              amount: selectedPackage.amount,
+              customerName,
+              customerEmail: email,
+              customerPhone: phone,
+              loggedInUser: authUser?.email || null,
+              transactionId: result?.transaction_id || '',
+            }).catch(swallowLogError('status pembayaran pending'))
+          },
+          onError: () => {
+            setPaymentStatus({
+              submitting: false,
+              checking: false,
+              error: 'Popup pembayaran gagal dibuka atau transaksi bermasalah.',
+              success: '',
+            })
+
+            writePaymentLog({
+              orderId,
+              type: 'payment_error',
+              paymentStatus: 'error',
+              packageCode: selectedPackage.code,
+              packageName: selectedPackage.name,
+              amount: selectedPackage.amount,
+              customerName,
+              customerEmail: email,
+              customerPhone: phone,
+              loggedInUser: authUser?.email || null,
+            }).catch(swallowLogError('status pembayaran error'))
+          },
+          onClose: () => {
+            setPaymentStatus({
+              submitting: false,
+              checking: false,
+              error: '',
+              success: 'Popup ditutup. Anda masih bisa lanjut bayar dari tombol redirect atau cek status.',
+            })
+
+            writePaymentLog({
+              orderId,
+              type: 'payment_popup_closed',
+              paymentStatus: 'pending',
+              packageCode: selectedPackage.code,
+              packageName: selectedPackage.name,
+              amount: selectedPackage.amount,
+              customerName,
+              customerEmail: email,
+              customerPhone: phone,
+              loggedInUser: authUser?.email || null,
+            }).catch(swallowLogError('penutupan popup pembayaran'))
+          },
+        })
+
+        return
+      }
+
+      if (redirectUrl) {
+        window.location.assign(redirectUrl)
+        return
+      }
+
+      setPaymentStatus({
+        submitting: false,
+        checking: false,
+        error: 'Backend tidak mengembalikan token atau redirectUrl pembayaran.',
+        success: '',
+      })
+    } catch (error) {
+      setPaymentStatus({
+        submitting: false,
+        checking: false,
+        error: error instanceof Error ? error.message : 'Gagal membuat transaksi pembayaran.',
+        success: '',
+      })
+
+      writePaymentLog({
+        orderId,
+        type: 'payment_request_failed',
+        paymentStatus: 'failed',
+        packageCode: selectedPackage?.code || '',
+        packageName: selectedPackage?.name || '',
+        amount: selectedPackage?.amount || 0,
+        customerName,
+        customerEmail: email,
+        customerPhone: phone,
+        notes: paymentForm.notes.trim(),
+        loggedInUser: authUser?.email || null,
+        errorMessage: error instanceof Error ? error.message : 'Gagal membuat transaksi pembayaran.',
+      }).catch(swallowLogError('pembuatan transaksi'))
     }
   }
 
@@ -1208,12 +1729,13 @@ function LandingPage({
                     <li key={feature}>{feature}</li>
                   ))}
                 </ul>
-                <a
+                <button
                   className={`button ${item.featured ? 'button-primary' : 'button-secondary'}`}
-                  href="#auth"
+                  type="button"
+                  onClick={() => handleSelectPackage(item.code)}
                 >
                   Pilih Paket
-                </a>
+                </button>
               </article>
             ))}
           </div>
@@ -1571,6 +2093,529 @@ function LandingPage({
           />
         </svg>
       </a>
+
+      {isPaymentModalOpen ? (
+        <div
+          className="payment-modal-overlay"
+          role="presentation"
+          onClick={() => setIsPaymentModalOpen(false)}
+        >
+          <div
+            className="payment-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="payment-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="payment-modal-header">
+              <div>
+                <span className="auth-user-label">Checkout Paket</span>
+                <h3 id="payment-modal-title">Pembayaran {selectedPackage?.name || 'Paket'}</h3>
+                <p>{selectedPackage?.description}</p>
+              </div>
+              <button
+                className="payment-modal-close"
+                type="button"
+                aria-label="Tutup modal pembayaran"
+                onClick={() => setIsPaymentModalOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="payment-modal-summary">
+              <div>
+                <span className="payment-package-name">Paket dipilih</span>
+                <strong>{selectedPackage?.name || '-'}</strong>
+              </div>
+              <strong>{selectedPackage?.price || '-'}</strong>
+            </div>
+
+            <form className="payment-form" onSubmit={handlePaymentSubmit}>
+              <label>
+                <span>Nama lengkap</span>
+                <input
+                  name="customerName"
+                  type="text"
+                  placeholder="Nama pembeli"
+                  value={paymentForm.customerName}
+                  onChange={handlePaymentInputChange}
+                />
+              </label>
+
+              <label>
+                <span>Email</span>
+                <input
+                  name="email"
+                  type="email"
+                  placeholder="nama@email.com"
+                  value={paymentForm.email}
+                  onChange={handlePaymentInputChange}
+                  disabled
+                />
+              </label>
+
+              <label>
+                <span>No. WhatsApp</span>
+                <input
+                  name="phone"
+                  type="tel"
+                  placeholder="08xxxxxxxxxx"
+                  value={paymentForm.phone}
+                  onChange={handlePaymentInputChange}
+                />
+              </label>
+
+              <label>
+                <span>Catatan order</span>
+                <textarea
+                  name="notes"
+                  rows="3"
+                  placeholder="Contoh: ingin tema golden untuk akad dan resepsi"
+                  value={paymentForm.notes}
+                  onChange={handlePaymentInputChange}
+                />
+              </label>
+
+              <div className="payment-modal-actions">
+                <button
+                  className="button button-secondary"
+                  type="button"
+                  onClick={() => setIsPaymentModalOpen(false)}
+                >
+                  Nanti Saja
+                </button>
+                <button
+                  className="button button-primary"
+                  type="submit"
+                  disabled={paymentStatus.submitting}
+                >
+                  {paymentStatus.submitting ? 'Membuat token...' : 'Bayar Sekarang'}
+                </button>
+              </div>
+
+              {paymentStatus.success ? (
+                <p className="auth-feedback success">{paymentStatus.success}</p>
+              ) : null}
+              {paymentStatus.error ? (
+                <p className="auth-feedback error">{paymentStatus.error}</p>
+              ) : null}
+            </form>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function AdminPage() {
+  const [isAdminNavOpen, setIsAdminNavOpen] = useState(false)
+  const [users, setUsers] = useState([])
+  const [paymentLogs, setPaymentLogs] = useState([])
+  const [selectedUserId, setSelectedUserId] = useState('')
+  const [selectedUserDetail, setSelectedUserDetail] = useState(null)
+  const [filters, setFilters] = useState({
+    status: '',
+    limit: 20,
+  })
+  const [adminStatus, setAdminStatus] = useState({
+    loading: true,
+    loadingUserDetail: false,
+    error: '',
+  })
+
+  const loadAdminData = async (nextFilters = filters, nextUserId = selectedUserId) => {
+    try {
+      setAdminStatus({
+        loading: true,
+        loadingUserDetail: false,
+        error: '',
+      })
+
+      const [usersPayload, paymentsPayload] = await Promise.all([
+        fetchAdminUsers(),
+        fetchAdminPaymentHistory({
+          status: nextFilters.status || undefined,
+          limit: nextFilters.limit || undefined,
+        }),
+      ])
+
+      setUsers(normalizeAdminUsers(usersPayload))
+      setPaymentLogs(normalizeAdminPayments(paymentsPayload))
+      setAdminStatus((current) => ({
+        ...current,
+        loading: false,
+        error: '',
+      }))
+    } catch (error) {
+      setAdminStatus({
+        loading: false,
+        loadingUserDetail: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Gagal memuat data admin.',
+      })
+    }
+  }
+
+  useEffect(() => {
+    loadAdminData()
+  }, [])
+
+  useEffect(() => {
+    if (!selectedUserId) {
+      setSelectedUserDetail(null)
+      return
+    }
+
+    const loadUserDetail = async () => {
+      try {
+        setAdminStatus((current) => ({
+          ...current,
+          loadingUserDetail: true,
+          error: '',
+        }))
+
+        const payload = await fetchAdminUserDetail(selectedUserId)
+        const user =
+          payload?.user ??
+          payload?.data?.user ??
+          payload?.data ??
+          payload
+
+        setSelectedUserDetail(user)
+        setAdminStatus((current) => ({
+          ...current,
+          loadingUserDetail: false,
+        }))
+      } catch (error) {
+        setSelectedUserDetail(null)
+        setAdminStatus((current) => ({
+          ...current,
+          loadingUserDetail: false,
+          error: error instanceof Error ? error.message : 'Gagal memuat detail user.',
+        }))
+      }
+    }
+
+    loadUserDetail()
+  }, [selectedUserId])
+
+  const handleFilterChange = (event) => {
+    const { name, value } = event.target
+    setFilters((current) => ({
+      ...current,
+      [name]: name === 'limit' ? Number(value) : value,
+    }))
+  }
+
+  const handleSelectedUserChange = (event) => {
+    const nextUserId = event.target.value
+
+    setSelectedUserId(nextUserId)
+  }
+
+  const handleApplyFilters = (event) => {
+    event.preventDefault()
+    loadAdminData(filters, selectedUserId)
+  }
+
+  const handleAdminNavAction = () => {
+    setIsAdminNavOpen(false)
+  }
+
+  const displayedUsers = selectedUserId
+    ? users.filter((item) => item.id === selectedUserId)
+    : users
+
+  const selectedUserRecord = users.find((item) => item.id === selectedUserId) || null
+  const selectedUserEmailValue = String(
+    selectedUserDetail?.email || selectedUserRecord?.email || '',
+  ).toLowerCase()
+
+  const displayedPaymentLogs = paymentLogs.filter((item) => {
+    const itemUserId = String(item.userId || '')
+    const loggedInUser = String(item.loggedInUser || '').toLowerCase()
+    const customerEmail = String(item.customerEmail || '').toLowerCase()
+
+    const matchesSelectedUser = !selectedUserId
+      ? true
+      : itemUserId === selectedUserId ||
+        (selectedUserEmailValue
+          ? loggedInUser === selectedUserEmailValue ||
+            customerEmail === selectedUserEmailValue
+          : false)
+
+    return matchesSelectedUser
+  })
+
+  const selectedUserName =
+    selectedUserDetail?.nama ||
+    selectedUserDetail?.name ||
+    selectedUserRecord?.name ||
+    '-'
+
+  const selectedUserEmail =
+    selectedUserDetail?.email ||
+    selectedUserRecord?.email ||
+    '-'
+
+  return (
+    <div className="page-shell admin-shell">
+      <header className="topbar">
+        <a className="brand" href="#beranda">
+          <span className="brand-mark">
+            <img src={logoMark} alt="JOINOURDAY logo" />
+          </span>
+          <span className="brand-text">
+            <strong>JOINOURDAY</strong>
+            <small>Admin Monitor</small>
+          </span>
+        </a>
+
+        <button
+          className={`menu-toggle${isAdminNavOpen ? ' active' : ''}`}
+          type="button"
+          aria-expanded={isAdminNavOpen}
+          aria-controls="admin-navigation"
+          aria-label={isAdminNavOpen ? 'Tutup menu admin' : 'Buka menu admin'}
+          onClick={() => setIsAdminNavOpen((open) => !open)}
+        >
+          <span />
+          <span />
+          <span />
+        </button>
+
+        <nav
+          className={`nav admin-nav${isAdminNavOpen ? ' nav-open' : ''}`}
+          id="admin-navigation"
+        >
+          <a href="#beranda" onClick={handleAdminNavAction}>Landing</a>
+          <a href="#auth" onClick={handleAdminNavAction}>Login</a>
+          <button
+            className="button button-secondary"
+            type="button"
+            onClick={() => {
+              handleAdminNavAction()
+              loadAdminData()
+            }}
+          >
+            Refresh
+          </button>
+        </nav>
+      </header>
+
+      <main className="admin-main">
+        <section className="section admin-hero">
+          <div className="section-heading reveal">
+            <span className="eyebrow">Admin Dashboard</span>
+            <h2>Data user dan history pembayaran dari backend admin.</h2>
+            <p className="admin-note">
+              Halaman ini membaca endpoint admin baru. Pastikan akun yang login membawa token admin
+              agar request `GET /api/auth/admin/users` dan `GET /api/payments/admin/history` tidak
+              ditolak backend.
+            </p>
+          </div>
+        </section>
+
+        {adminStatus.error ? <p className="auth-feedback error">{adminStatus.error}</p> : null}
+
+        <section className="admin-toolbar">
+          <form className="admin-filter-form" onSubmit={handleApplyFilters}>
+            <label>
+              <span>User</span>
+              <select name="selectedUserId" value={selectedUserId} onChange={handleSelectedUserChange}>
+                <option value="">Semua user</option>
+                {users.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.email}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Status</span>
+              <select name="status" value={filters.status} onChange={handleFilterChange}>
+                <option value="">Semua status</option>
+                <option value="pending">pending</option>
+                <option value="settlement">settlement</option>
+                <option value="capture">capture</option>
+                <option value="deny">deny</option>
+                <option value="cancel">cancel</option>
+                <option value="expire">expire</option>
+                <option value="failed">failed</option>
+              </select>
+            </label>
+            <label>
+              <span>Limit</span>
+              <select name="limit" value={filters.limit} onChange={handleFilterChange}>
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+            </label>
+            <button className="button button-primary" type="submit" disabled={adminStatus.loading}>
+              {adminStatus.loading ? 'Memuat...' : 'Terapkan'}
+            </button>
+          </form>
+        </section>
+
+        <section className="admin-grid">
+          <article className="admin-card">
+            <div className="admin-card-header">
+              <div>
+                <span className="auth-user-label">Akun</span>
+                <h3>Daftar User</h3>
+              </div>
+              <strong>{displayedUsers.length}</strong>
+            </div>
+
+            {adminStatus.loading ? (
+              <p className="admin-empty">Memuat data user...</p>
+            ) : displayedUsers.length ? (
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>User ID</th>
+                      <th>Nama</th>
+                      <th>Email</th>
+                      <th>Role</th>
+                      <th>Last Login</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {displayedUsers.map((item) => (
+                      <tr
+                        key={item.id}
+                        className={selectedUserId === item.id ? 'admin-row-selected' : ''}
+                        onClick={() => setSelectedUserId(item.id)}
+                      >
+                        <td data-label="User ID">{item.id}</td>
+                        <td data-label="Nama">{item.name || '-'}</td>
+                        <td data-label="Email">{item.email || '-'}</td>
+                        <td data-label="Role">{item.role || '-'}</td>
+                        <td data-label="Last Login">{formatDateTime(item.lastLoginAt)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="admin-empty">Tidak ada user yang cocok dengan filter.</p>
+            )}
+          </article>
+
+          <article className="admin-card">
+            <div className="admin-card-header">
+              <div>
+                <span className="auth-user-label">Pembayaran</span>
+                <h3>History Transaksi</h3>
+                <p className="admin-subtitle">
+                  Menampilkan data pembayaran backend sesuai filter yang aktif.
+                </p>
+              </div>
+              <strong>{displayedPaymentLogs.length}</strong>
+            </div>
+
+            {adminStatus.loading ? (
+              <p className="admin-empty">Memuat data pembayaran...</p>
+            ) : displayedPaymentLogs.length ? (
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Status</th>
+                      <th>Order ID</th>
+                      <th>Akun Login</th>
+                      <th>Pembeli</th>
+                      <th>Paket</th>
+                      <th>Total</th>
+                      <th>Waktu</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {displayedPaymentLogs.map((item) => (
+                      <tr key={item.id}>
+                        <td data-label="Status">
+                          <span className={`status-chip ${item.paymentStatus || item.type || 'info'}`}>
+                            {item.paymentStatus || item.type || '-'}
+                          </span>
+                        </td>
+                        <td data-label="Order ID">{item.orderId || '-'}</td>
+                        <td data-label="Akun Login">{item.loggedInUser || item.userId || '-'}</td>
+                        <td data-label="Pembeli">{item.customerName || item.customerEmail || '-'}</td>
+                        <td data-label="Paket">{item.packageName || '-'}</td>
+                        <td data-label="Total">{item.amount ? `Rp${item.amount.toLocaleString('id-ID')}` : '-'}</td>
+                        <td data-label="Waktu">{formatDateTime(item.createdAt)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="admin-empty">Tidak ada history transaksi yang cocok dengan filter.</p>
+            )}
+          </article>
+        </section>
+
+        <section className="admin-grid">
+          <article className="admin-card">
+            <div className="admin-card-header">
+              <div>
+                <span className="auth-user-label">Detail</span>
+                <h3>User Terpilih</h3>
+                {selectedUserId ? (
+                  <p className="admin-subtitle">
+                    {selectedUserName} ({selectedUserEmail})
+                  </p>
+                ) : null}
+              </div>
+            </div>
+
+            {!selectedUserId ? (
+              <p className="admin-empty">Pilih user dari tabel untuk melihat detail.</p>
+            ) : adminStatus.loadingUserDetail ? (
+              <p className="admin-empty">Memuat detail user...</p>
+            ) : selectedUserDetail ? (
+              <div className="admin-table-wrap">
+                <table className="admin-table admin-table-compact">
+                  <tbody>
+                    <tr>
+                      <th>User ID</th>
+                      <td data-label="User ID">{selectedUserDetail?.id || selectedUserDetail?._id || selectedUserId}</td>
+                    </tr>
+                    <tr>
+                      <th>Nama</th>
+                      <td data-label="Nama">{selectedUserDetail?.nama || selectedUserDetail?.name || '-'}</td>
+                    </tr>
+                    <tr>
+                      <th>Email</th>
+                      <td data-label="Email">{selectedUserDetail?.email || '-'}</td>
+                    </tr>
+                    <tr>
+                      <th>Role</th>
+                      <td data-label="Role">{selectedUserDetail?.role || selectedUserDetail?.user_type || '-'}</td>
+                    </tr>
+                    <tr>
+                      <th>Dibuat</th>
+                      <td data-label="Dibuat">{formatDateTime(selectedUserDetail?.createdAt || selectedUserDetail?.created_at)}</td>
+                    </tr>
+                    <tr>
+                      <th>Last Login</th>
+                      <td data-label="Last Login">{formatDateTime(selectedUserDetail?.lastLoginAt || selectedUserDetail?.last_login_at)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="admin-empty">Detail user tidak tersedia.</p>
+            )}
+          </article>
+        </section>
+      </main>
     </div>
   )
 }
@@ -1603,6 +2648,10 @@ function App() {
 
   if (selectedTheme) {
     return <DemoPage theme={selectedTheme} />
+  }
+
+  if (routeHash === '#admin') {
+    return <AdminPage />
   }
 
   return (

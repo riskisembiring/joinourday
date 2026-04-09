@@ -15,5 +15,82 @@ service cloud.firestore {
         request.resource.data.quote.size() <= 500;
       allow update, delete: if false;
     }
+
+    match /admin_auth_logs/{document=**} {
+      allow read: if true;
+      allow create: if
+        request.resource.data.keys().hasOnly([
+          'type',
+          'userEmail',
+          'userName',
+          'loggedInAt',
+          'createdAt'
+        ]) &&
+        request.resource.data.type is string &&
+        request.resource.data.type.size() > 1 &&
+        request.resource.data.type.size() <= 40 &&
+        request.resource.data.userEmail is string &&
+        request.resource.data.userEmail.size() > 3 &&
+        request.resource.data.userEmail.size() <= 160 &&
+        request.resource.data.userName is string &&
+        request.resource.data.userName.size() <= 120;
+      allow update, delete: if false;
+    }
+
+    match /admin_payment_logs/{document=**} {
+      allow read: if true;
+      allow create: if
+        request.resource.data.keys().hasOnly([
+          'orderId',
+          'type',
+          'paymentStatus',
+          'fraudStatus',
+          'packageCode',
+          'packageName',
+          'amount',
+          'customerName',
+          'customerEmail',
+          'customerPhone',
+          'notes',
+          'loggedInUser',
+          'redirectUrl',
+          'transactionId',
+          'errorMessage',
+          'createdAt'
+        ]) &&
+        request.resource.data.orderId is string &&
+        request.resource.data.orderId.size() > 3 &&
+        request.resource.data.orderId.size() <= 120 &&
+        request.resource.data.type is string &&
+        request.resource.data.type.size() > 1 &&
+        request.resource.data.type.size() <= 60 &&
+        request.resource.data.paymentStatus is string &&
+        request.resource.data.paymentStatus.size() > 1 &&
+        request.resource.data.paymentStatus.size() <= 60 &&
+        request.resource.data.packageCode is string &&
+        request.resource.data.packageCode.size() <= 60 &&
+        request.resource.data.packageName is string &&
+        request.resource.data.packageName.size() <= 120 &&
+        request.resource.data.amount is number &&
+        request.resource.data.customerName is string &&
+        request.resource.data.customerName.size() <= 120 &&
+        request.resource.data.customerEmail is string &&
+        request.resource.data.customerEmail.size() <= 160 &&
+        request.resource.data.customerPhone is string &&
+        request.resource.data.customerPhone.size() <= 40 &&
+        request.resource.data.notes is string &&
+        request.resource.data.notes.size() <= 500 &&
+        request.resource.data.loggedInUser is string &&
+        request.resource.data.loggedInUser.size() <= 160 &&
+        request.resource.data.redirectUrl is string &&
+        request.resource.data.redirectUrl.size() <= 500 &&
+        request.resource.data.transactionId is string &&
+        request.resource.data.transactionId.size() <= 120 &&
+        request.resource.data.errorMessage is string &&
+        request.resource.data.errorMessage.size() <= 500 &&
+        request.resource.data.fraudStatus is string &&
+        request.resource.data.fraudStatus.size() <= 60;
+      allow update, delete: if false;
+    }
   }
 }

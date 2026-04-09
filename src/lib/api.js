@@ -3,7 +3,67 @@ const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, ''
 const endpoints = {
   login: import.meta.env.VITE_API_LOGIN_ENDPOINT || '/api/auth/login',
   register: import.meta.env.VITE_API_REGISTER_ENDPOINT || '/api/auth/register',
+  adminUsers: import.meta.env.VITE_API_ADMIN_USERS_ENDPOINT || '/api/auth/admin/users',
   testimonials: import.meta.env.VITE_API_TESTIMONIALS_ENDPOINT || '/api/testimonials',
+  paymentHistory: import.meta.env.VITE_API_PAYMENT_HISTORY_ENDPOINT || '/api/payments/history',
+  adminPaymentHistory:
+    import.meta.env.VITE_API_ADMIN_PAYMENT_HISTORY_ENDPOINT || '/api/payments/admin/history',
+  midtransToken:
+    import.meta.env.VITE_API_MIDTRANS_TOKEN_ENDPOINT || '/api/payments/midtrans/token',
+  midtransStatus:
+    import.meta.env.VITE_API_MIDTRANS_STATUS_ENDPOINT || '/api/payments/midtrans/status',
+}
+
+const getStoredAuthUser = () => {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  const rawValue = window.localStorage.getItem('joinourday-auth-user')
+
+  if (!rawValue) {
+    return null
+  }
+
+  try {
+    return JSON.parse(rawValue)
+  } catch {
+    return null
+  }
+}
+
+const getAuthToken = () => {
+  const authUser = getStoredAuthUser()
+
+  return (
+    authUser?.token ||
+    authUser?.accessToken ||
+    authUser?.access_token ||
+    authUser?.tokens?.accessToken ||
+    authUser?.tokens?.access_token ||
+    authUser?.data?.token ||
+    authUser?.data?.accessToken ||
+    authUser?.data?.access_token ||
+    authUser?.data?.tokens?.accessToken ||
+    authUser?.data?.tokens?.access_token ||
+    authUser?.jwt ||
+    ''
+  )
+}
+
+const createQueryString = (params = {}) => {
+  const searchParams = new URLSearchParams()
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') {
+      return
+    }
+
+    searchParams.set(key, String(value))
+  })
+
+  const queryString = searchParams.toString()
+  return queryString ? `?${queryString}` : ''
 }
 
 const buildUrl = (endpoint) => {
@@ -63,9 +123,12 @@ const normalizeTestimonials = (payload) => {
 }
 
 const request = async (endpoint, options = {}) => {
+  const token = getAuthToken()
+
   const response = await fetch(buildUrl(endpoint), {
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {}),
     },
     ...options,
@@ -109,4 +172,48 @@ const registerUser = async (body) => {
   })
 }
 
-export { createTestimonial, fetchTestimonials, loginUser, registerUser }
+const fetchAdminUsers = async () => {
+  return request(endpoints.adminUsers, { method: 'GET' })
+}
+
+const fetchAdminUserDetail = async (userId) => {
+  return request(`${endpoints.adminUsers}/${encodeURIComponent(userId)}`, {
+    method: 'GET',
+  })
+}
+
+const fetchPaymentHistory = async () => {
+  return request(endpoints.paymentHistory, { method: 'GET' })
+}
+
+const fetchAdminPaymentHistory = async (params = {}) => {
+  return request(`${endpoints.adminPaymentHistory}${createQueryString(params)}`, {
+    method: 'GET',
+  })
+}
+
+const createMidtransTransaction = async (body) => {
+  return request(endpoints.midtransToken, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+const fetchMidtransStatus = async (orderId) => {
+  return request(`${endpoints.midtransStatus}/${encodeURIComponent(orderId)}`, {
+    method: 'GET',
+  })
+}
+
+export {
+  createMidtransTransaction,
+  createTestimonial,
+  fetchAdminPaymentHistory,
+  fetchAdminUserDetail,
+  fetchAdminUsers,
+  fetchMidtransStatus,
+  fetchPaymentHistory,
+  fetchTestimonials,
+  loginUser,
+  registerUser,
+}
