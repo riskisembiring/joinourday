@@ -7,6 +7,7 @@ import demoMusicFile from './audio/Kala Cinta Menggoda (Chrisye Cover) - Forte E
 import {
   createMidtransTransaction,
   createTestimonial,
+  extractAuthToken,
   fetchAdminPaymentHistory,
   fetchAdminUserDetail,
   fetchAdminUsers,
@@ -217,27 +218,7 @@ const getAuthUser = (payload, fallbackName, fallbackEmail) => {
     name,
     email,
     role: user?.role ?? user?.user_type ?? payload?.role ?? '',
-    token:
-      payload?.token ??
-      payload?.accessToken ??
-      payload?.access_token ??
-      payload?.data?.token ??
-      payload?.data?.accessToken ??
-      payload?.data?.access_token ??
-      payload?.data?.data?.token ??
-      payload?.data?.data?.accessToken ??
-      payload?.data?.data?.access_token ??
-      payload?.user?.token ??
-      payload?.user?.accessToken ??
-      payload?.user?.access_token ??
-      payload?.data?.user?.token ??
-      payload?.data?.user?.accessToken ??
-      payload?.data?.user?.access_token ??
-      payload?.tokens?.accessToken ??
-      payload?.tokens?.access_token ??
-      payload?.data?.tokens?.accessToken ??
-      payload?.data?.tokens?.access_token ??
-      '',
+    token: extractAuthToken(payload),
   }
 }
 
@@ -365,7 +346,7 @@ const loadMidtransSnap = () => {
   return new Promise((resolve, reject) => {
     const script = document.createElement('script')
     script.src =
-      import.meta.env.VITE_MIDTRANS_SNAP_URL || 'https://app.sandbox.midtrans.com/snap/snap.js'
+      import.meta.env.VITE_MIDTRANS_SNAP_URL || 'https://app.midtrans.com/snap/snap.js'
     script.dataset.midtransSnap = 'true'
     script.dataset.clientKey = clientKey
     script.onload = () => resolve(window.snap)
@@ -940,6 +921,7 @@ function LandingPage({
     error: '',
     success: '',
   })
+  const latestPaymentAttemptRef = useRef(0)
 
   const selectedPackage = packages.find((item) => item.code === selectedPackageCode) ?? packages[0]
 
@@ -1283,6 +1265,10 @@ function LandingPage({
   const handlePaymentSubmit = async (event) => {
     event.preventDefault()
 
+    if (paymentStatus.submitting) {
+      return
+    }
+
     const customerName = paymentForm.customerName.trim()
     const email = paymentForm.email.trim()
     const phone = paymentForm.phone.trim()
@@ -1298,6 +1284,9 @@ function LandingPage({
     }
 
     const orderId = buildOrderId(selectedPackage.code)
+    const paymentAttemptId = latestPaymentAttemptRef.current + 1
+    latestPaymentAttemptRef.current = paymentAttemptId
+    const isLatestPaymentAttempt = () => latestPaymentAttemptRef.current === paymentAttemptId
 
     try {
       setPaymentStatus({
@@ -1356,6 +1345,10 @@ function LandingPage({
         },
       })
 
+      if (!isLatestPaymentAttempt()) {
+        return
+      }
+
       const transaction = getPaymentTransaction(response)
       const token = transaction?.token ?? response?.token
       const redirectUrl = transaction?.redirectUrl ?? transaction?.redirect_url ?? response?.redirectUrl
@@ -1398,8 +1391,16 @@ function LandingPage({
       if (token) {
         const snap = await loadMidtransSnap()
 
+        if (!isLatestPaymentAttempt()) {
+          return
+        }
+
         snap.pay(token, {
           onSuccess: (result) => {
+            if (!isLatestPaymentAttempt()) {
+              return
+            }
+
             const paidPayment = {
               ...nextPayment,
               status: result?.transaction_status || 'settlement',
@@ -1428,6 +1429,10 @@ function LandingPage({
             }).catch(swallowLogError('status pembayaran sukses'))
           },
           onPending: (result) => {
+            if (!isLatestPaymentAttempt()) {
+              return
+            }
+
             const pendingPayment = {
               ...nextPayment,
               status: result?.transaction_status || 'pending',
@@ -1456,6 +1461,10 @@ function LandingPage({
             }).catch(swallowLogError('status pembayaran pending'))
           },
           onError: () => {
+            if (!isLatestPaymentAttempt()) {
+              return
+            }
+
             setPaymentStatus({
               submitting: false,
               checking: false,
@@ -1477,6 +1486,10 @@ function LandingPage({
             }).catch(swallowLogError('status pembayaran error'))
           },
           onClose: () => {
+            if (!isLatestPaymentAttempt()) {
+              return
+            }
+
             setPaymentStatus({
               submitting: false,
               checking: false,
@@ -1503,6 +1516,10 @@ function LandingPage({
       }
 
       if (redirectUrl) {
+        if (!isLatestPaymentAttempt()) {
+          return
+        }
+
         window.location.assign(redirectUrl)
         return
       }
@@ -1514,6 +1531,10 @@ function LandingPage({
         success: '',
       })
     } catch (error) {
+      if (!isLatestPaymentAttempt()) {
+        return
+      }
+
       setPaymentStatus({
         submitting: false,
         checking: false,
