@@ -9,6 +9,7 @@ import {
   createTestimonial,
   extractAuthToken,
   fetchAdminPaymentHistory,
+  fetchMidtransStatus,
   fetchAdminUserDetail,
   fetchAdminUsers,
   fetchTestimonials,
@@ -73,8 +74,8 @@ const packages = [
   {
     name: 'Basic',
     code: 'basic',
-    price: 'Rp50.000',
-    amount: 50000,
+    price: 'Rp5.000',
+    amount: 5000,
     description: 'Untuk pasangan yang ingin mulai cepat dengan tampilan tetap elegan.',
     features: ['1 tema pilihan', 'RSVP dasar', 'Countdown acara', 'Share link WhatsApp'],
     featured: false,
@@ -135,6 +136,8 @@ const features = [
 const whatsappLink =
   'https://wa.me/6285270106090?text=%5Bka%5D%20Halo%20joinourday%2C%20saya%20mau%20buat%20undangan%20nih%2C%20mau%20tanya%20dong%20...'
 
+const ADMIN_EMAIL = 'ikiputra876@gmail.com'
+
 const demoSectionIds = ['demo-cover', 'demo-event', 'demo-gallery', 'demo-gift']
 
 const createInitials = (name) =>
@@ -144,6 +147,58 @@ const createInitials = (name) =>
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? '')
     .join('')
+
+const getStoredSessionAuthUser = () => {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  const saved = window.localStorage.getItem('joinourday-auth-user')
+
+  if (!saved) {
+    return null
+  }
+
+  try {
+    return JSON.parse(saved)
+  } catch {
+    return null
+  }
+}
+
+const getPaymentStorageKey = (email) => {
+  const normalizedEmail = String(email || '').trim().toLowerCase()
+
+  if (!normalizedEmail) {
+    return ''
+  }
+
+  return `joinourday-latest-payment:${normalizedEmail}`
+}
+
+const getStoredLatestPayment = (email) => {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  const storageKey = getPaymentStorageKey(email)
+
+  if (!storageKey) {
+    return null
+  }
+
+  const saved = window.localStorage.getItem(storageKey)
+
+  if (!saved) {
+    return null
+  }
+
+  try {
+    return JSON.parse(saved)
+  } catch {
+    return null
+  }
+}
 
 const normalizeTestimonialItem = (item, index) => {
   const name = item?.nama?.trim() || item?.name?.trim() || 'Pengguna JOINOURDAY'
@@ -248,6 +303,57 @@ const formatDateTime = (value) => {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(date)
+}
+
+const formatCurrency = (value) =>
+  new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    maximumFractionDigits: 0,
+  }).format(Number(value) || 0)
+
+const normalizePaymentLifecycleStatus = (value) => {
+  if (typeof value !== 'string') {
+    return 'pending'
+  }
+
+  const normalized = value.trim().toLowerCase()
+
+  return normalized || 'pending'
+}
+
+const getPaymentStatusLabel = (value) => {
+  const status = normalizePaymentLifecycleStatus(value)
+
+  if (status === 'settlement') {
+    return 'Pembayaran berhasil'
+  }
+
+  if (status === 'capture') {
+    return 'Pembayaran terverifikasi'
+  }
+
+  if (status === 'pending') {
+    return 'Menunggu pembayaran'
+  }
+
+  if (status === 'deny') {
+    return 'Pembayaran ditolak'
+  }
+
+  if (status === 'cancel') {
+    return 'Pembayaran dibatalkan'
+  }
+
+  if (status === 'expire') {
+    return 'Pembayaran kedaluwarsa'
+  }
+
+  if (status === 'failed' || status === 'failure' || status === 'error') {
+    return 'Pembayaran gagal'
+  }
+
+  return status.replace(/_/g, ' ')
 }
 
 const swallowLogError = (scope) => (error) => {
@@ -909,12 +1015,14 @@ function LandingPage({
     return featuredPackage?.code || packages[0]?.code || ''
   })
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
+  const [isSnapModalOpen, setIsSnapModalOpen] = useState(false)
   const [paymentForm, setPaymentForm] = useState(() => ({
     customerName: authUser?.name || '',
     email: authUser?.email || '',
     phone: '',
     notes: '',
   }))
+  const [latestPayment, setLatestPayment] = useState(() => getStoredLatestPayment(authUser?.email))
   const [paymentStatus, setPaymentStatus] = useState({
     submitting: false,
     checking: false,
@@ -922,32 +1030,52 @@ function LandingPage({
     success: '',
   })
   const latestPaymentAttemptRef = useRef(0)
+  const snapEmbedContainerId = 'joinourday-snap-embed'
 
   const selectedPackage = packages.find((item) => item.code === selectedPackageCode) ?? packages[0]
+  const activePaymentStorageKey = getPaymentStorageKey(authUser?.email)
+  const latestPaymentStatus = normalizePaymentLifecycleStatus(latestPayment?.status)
+  const latestPaymentStatusLabel = getPaymentStatusLabel(latestPaymentStatus)
 
-  useEffect(() => {
-    if (!isPaymentModalOpen) {
-      return undefined
+  const persistLatestPayment = (payment) => {
+    setLatestPayment(payment)
+
+    if (!activePaymentStorageKey) {
+      return
     }
 
-    const { body } = document
-    const previousOverflow = body.style.overflow
+    if (payment) {
+      window.localStorage.setItem(activePaymentStorageKey, JSON.stringify(payment))
+      return
+    }
 
-    body.style.overflow = 'hidden'
+    window.localStorage.removeItem(activePaymentStorageKey)
+  }
+
+  useEffect(() => {
+    setLatestPayment(getStoredLatestPayment(authUser?.email))
+  }, [authUser?.email])
+
+  useEffect(() => {
+    const { body } = document
+    const isAnyModalOpen = isPaymentModalOpen || isSnapModalOpen
+
+    body.style.overflow = isAnyModalOpen ? 'hidden' : ''
 
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
         setIsPaymentModalOpen(false)
+        setIsSnapModalOpen(false)
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
 
     return () => {
-      body.style.overflow = previousOverflow
+      body.style.overflow = ''
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [isPaymentModalOpen])
+  }, [isPaymentModalOpen, isSnapModalOpen])
 
   useEffect(() => {
     const loadTestimonials = async () => {
@@ -975,6 +1103,154 @@ function LandingPage({
 
     loadTestimonials()
   }, [])
+
+  useEffect(() => {
+    if (!isSnapModalOpen || !latestPayment?.token) {
+      return undefined
+    }
+
+    let isActive = true
+
+    const embedSnap = async () => {
+      try {
+        const snap = await loadMidtransSnap()
+
+        if (!isActive) {
+          return
+        }
+
+        const container = document.getElementById(snapEmbedContainerId)
+
+        if (!container) {
+          return
+        }
+
+        container.innerHTML = ''
+
+        if (typeof snap.embed === 'function') {
+          snap.embed(latestPayment.token, {
+            embedId: snapEmbedContainerId,
+            onSuccess: (result) => {
+              const paidPayment = {
+                ...latestPayment,
+                status: result?.transaction_status || 'settlement',
+              }
+
+              persistLatestPayment(paidPayment)
+              setIsSnapModalOpen(false)
+              setPaymentStatus({
+                submitting: false,
+                checking: false,
+                error: '',
+                success: 'Pembayaran berhasil diselesaikan.',
+              })
+            },
+            onPending: (result) => {
+              const pendingPayment = {
+                ...latestPayment,
+                status: result?.transaction_status || 'pending',
+              }
+
+              persistLatestPayment(pendingPayment)
+              setPaymentStatus({
+                submitting: false,
+                checking: false,
+                error: '',
+                success: 'Pembayaran masih menunggu penyelesaian.',
+              })
+            },
+            onError: () => {
+              setPaymentStatus({
+                submitting: false,
+                checking: false,
+                error: 'Snap pembayaran gagal dimuat di dalam modal.',
+                success: '',
+              })
+            },
+            onClose: () => {
+              setIsSnapModalOpen(false)
+              setPaymentStatus({
+                submitting: false,
+                checking: false,
+                error: '',
+                success:
+                  'Popup ditutup. Anda masih bisa lanjut bayar atau cek status dari kartu transaksi terakhir.',
+              })
+            },
+          })
+
+          return
+        }
+
+        setIsSnapModalOpen(false)
+        snap.pay(latestPayment.token, {
+          onSuccess: (result) => {
+            const paidPayment = {
+              ...latestPayment,
+              status: result?.transaction_status || 'settlement',
+            }
+
+            persistLatestPayment(paidPayment)
+            setPaymentStatus({
+              submitting: false,
+              checking: false,
+              error: '',
+              success: 'Pembayaran berhasil diselesaikan.',
+            })
+          },
+          onPending: (result) => {
+            const pendingPayment = {
+              ...latestPayment,
+              status: result?.transaction_status || 'pending',
+            }
+
+            persistLatestPayment(pendingPayment)
+            setPaymentStatus({
+              submitting: false,
+              checking: false,
+              error: '',
+              success: 'Pembayaran masih menunggu penyelesaian.',
+            })
+          },
+          onError: () => {
+            setPaymentStatus({
+              submitting: false,
+              checking: false,
+              error: 'Popup pembayaran gagal dibuka atau transaksi bermasalah.',
+              success: '',
+            })
+          },
+          onClose: () => {
+            setPaymentStatus({
+              submitting: false,
+              checking: false,
+              error: '',
+              success:
+                'Popup ditutup. Anda masih bisa lanjut bayar atau cek status dari kartu transaksi terakhir.',
+            })
+          },
+        })
+      } catch (error) {
+        setIsSnapModalOpen(false)
+        setPaymentStatus({
+          submitting: false,
+          checking: false,
+          error: error instanceof Error ? error.message : 'Gagal memuat Snap pembayaran.',
+          success: '',
+        })
+      }
+    }
+
+    embedSnap()
+
+    return () => {
+      isActive = false
+
+      if (window.snap?.hide) {
+        window.snap.hide()
+      }
+    }
+  }, [isSnapModalOpen, latestPayment, snapEmbedContainerId])
 
   useEffect(() => {
     const section = testimonialSectionRef.current
@@ -1365,7 +1641,7 @@ function LandingPage({
         status: 'pending',
       }
 
-      window.localStorage.setItem('joinourday-latest-payment', JSON.stringify(nextPayment))
+      persistLatestPayment(nextPayment)
       setPaymentStatus({
         submitting: false,
         checking: false,
@@ -1405,7 +1681,7 @@ function LandingPage({
               ...nextPayment,
               status: result?.transaction_status || 'settlement',
             }
-            window.localStorage.setItem('joinourday-latest-payment', JSON.stringify(paidPayment))
+            persistLatestPayment(paidPayment)
             setPaymentStatus({
               submitting: false,
               checking: false,
@@ -1437,7 +1713,7 @@ function LandingPage({
               ...nextPayment,
               status: result?.transaction_status || 'pending',
             }
-            window.localStorage.setItem('joinourday-latest-payment', JSON.stringify(pendingPayment))
+            persistLatestPayment(pendingPayment)
             setPaymentStatus({
               submitting: false,
               checking: false,
@@ -1494,7 +1770,8 @@ function LandingPage({
               submitting: false,
               checking: false,
               error: '',
-              success: 'Popup ditutup. Anda masih bisa lanjut bayar dari tombol redirect atau cek status.',
+              success:
+                'Popup ditutup. Anda masih bisa lanjut bayar atau cek status dari kartu transaksi terakhir.',
             })
 
             writePaymentLog({
@@ -1559,6 +1836,106 @@ function LandingPage({
     }
   }
 
+  const handleResumePayment = () => {
+    if (!latestPayment?.orderId) {
+      return
+    }
+
+    setPaymentStatus({
+      submitting: false,
+      checking: false,
+      error: '',
+      success: '',
+    })
+
+    if (latestPayment.token) {
+      setIsSnapModalOpen(true)
+      return
+    }
+
+    if (latestPayment.redirectUrl) {
+      window.location.assign(latestPayment.redirectUrl)
+      return
+    }
+
+    if (!latestPayment.token) {
+      setPaymentStatus({
+        submitting: false,
+        checking: false,
+        error: 'Redirect pembayaran tidak tersedia untuk transaksi terakhir ini.',
+        success: '',
+      })
+    }
+  }
+
+  const handleCheckLatestPaymentStatus = async () => {
+    if (!latestPayment?.orderId || paymentStatus.checking) {
+      return
+    }
+
+    try {
+      setPaymentStatus({
+        submitting: false,
+        checking: true,
+        error: '',
+        success: '',
+      })
+
+      const payload = await fetchMidtransStatus(latestPayment.orderId)
+      const status =
+        payload?.transaction_status ||
+        payload?.status ||
+        payload?.paymentStatus ||
+        payload?.data?.transaction_status ||
+        payload?.data?.status ||
+        latestPayment.status
+
+      const redirectUrl =
+        payload?.redirect_url ||
+        payload?.redirectUrl ||
+        payload?.data?.redirect_url ||
+        payload?.data?.redirectUrl ||
+        latestPayment.redirectUrl ||
+        ''
+
+      const checkedPayment = {
+        ...latestPayment,
+        status: normalizePaymentLifecycleStatus(status),
+        redirectUrl,
+      }
+
+      persistLatestPayment(checkedPayment)
+      setPaymentStatus({
+        submitting: false,
+        checking: false,
+        error: '',
+        success: `Status pembayaran order ${latestPayment.orderId}: ${getPaymentStatusLabel(status)}.`,
+      })
+
+      writePaymentLog({
+        orderId: latestPayment.orderId,
+        type: 'payment_status_checked',
+        paymentStatus: normalizePaymentLifecycleStatus(status),
+        packageName: latestPayment.packageName || '',
+        amount: latestPayment.amount || 0,
+        customerName: latestPayment.customerName || '',
+        customerEmail: latestPayment.customerEmail || '',
+        customerPhone: latestPayment.customerPhone || '',
+        loggedInUser: authUser?.email || latestPayment.loggedInUser || null,
+      }).catch(swallowLogError('pengecekan status pembayaran'))
+    } catch (error) {
+      setPaymentStatus({
+        submitting: false,
+        checking: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Gagal memeriksa status pembayaran.',
+        success: '',
+      })
+    }
+  }
+
   return (
     <div className="page-shell">
       <header className="topbar">
@@ -1607,6 +1984,10 @@ function LandingPage({
               dengan desain elegan, fitur lengkap, dan pengalaman yang mudah untuk
               Anda maupun tamu.
             </p>
+            <div className="hero-event-meta">
+              <strong>Jakarta, Indonesia</strong>
+              <span>Undangan digital elegan dengan RSVP otomatis dan tema siap pakai.</span>
+            </div>
             <div className="hero-actions">
               <a className="button button-primary" href="#tema">
                 Lihat Tema
@@ -1621,39 +2002,54 @@ function LandingPage({
                 <span>Undangan dibuat</span>
               </div>
               <div>
-                <strong>98%</strong>
-                <span>Kepuasan pengguna</span>
+                <strong>3 tema populer</strong>
+                <span>Siap pakai dan mudah disesuaikan</span>
               </div>
               <div>
-                <strong>24/7</strong>
-                <span>Dukungan online</span>
+                <strong>Template premium</strong>
+                <span>Tampilan rapi untuk desktop dan mobile</span>
               </div>
             </div>
           </div>
 
           <div className="hero-visual reveal reveal-delay">
-            <div className="phone-mockup">
-              <div className="mockup-screen">
-                <span className="mockup-badge">Wedding Invitation</span>
-                <h2>Amara &amp; Bima</h2>
-                <p>Saturday, 21 September 2026</p>
-                <div
-                  className="mockup-photo"
-                  style={{ '--mockup-image': `url(${demoImageTwo})` }}
-                />
-                <div className="mockup-card">
-                  <span>Save The Date</span>
-                  <strong>Jakarta, Indonesia</strong>
+            <div className="hero-phone-stack">
+              <div className="phone-mockup phone-mockup-left">
+                <div className="mockup-notch" />
+                <div className="mockup-screen mockup-screen-cover">
+                  <div
+                    className="mockup-photo mockup-photo-cover"
+                    style={{ '--mockup-image': `url(${demoImageOne})` }}
+                  >
+                    <div className="mockup-cover-copy">
+                      <h2>Amara &amp; Bima</h2>
+                      <p>Saturday, 21 September 2026</p>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="floating-card card-one">
-              <strong>RSVP 186 tamu</strong>
-              <span>Konfirmasi hadir masuk otomatis</span>
-            </div>
-            <div className="floating-card card-two">
-              <strong>3 tema populer</strong>
-              <span>Siap pakai dan mudah disesuaikan</span>
+              <div className="phone-mockup phone-mockup-right">
+                <div className="mockup-notch" />
+                <div className="mockup-screen mockup-screen-editorial">
+                  <div
+                    className="mockup-photo mockup-photo-editorial"
+                    style={{ '--mockup-image': `url(${demoImageTwo})` }}
+                  />
+                  <div className="mockup-card">
+                    <span>Save The Date</span>
+                    <strong>Jakarta, Indonesia</strong>
+                    <p>Desain bersih, modern, dan mudah disesuaikan untuk hari spesial.</p>
+                  </div>
+                </div>
+              </div>
+              <div className="floating-card card-one">
+                <strong>RSVP 186 tamu</strong>
+                <span>Konfirmasi hadir masuk otomatis</span>
+              </div>
+              <div className="floating-card card-two">
+                <strong>3 tema populer</strong>
+                <span>Siap pakai dan mudah disesuaikan</span>
+              </div>
             </div>
           </div>
         </section>
@@ -1765,6 +2161,58 @@ function LandingPage({
             <span />
             <span />
           </div>
+
+          {latestPayment?.orderId ? (
+            <article className="payment-card reveal">
+              <div className="payment-card-header">
+                <div>
+                  <span className="auth-user-label">Transaksi Terakhir</span>
+                  <h3>Pembayaran terakhir akun ini.</h3>
+                  <p>
+                    Order ID: {latestPayment.orderId}. Gunakan tombol lanjut bayar jika transaksi
+                    belum selesai, atau perbarui status jika Anda sudah membayar di popup/bank.
+                  </p>
+                </div>
+                <span className={`status-chip ${latestPaymentStatus}`}>
+                  {latestPaymentStatusLabel}
+                </span>
+              </div>
+
+              <div className="payment-card-meta">
+                <div>
+                  <span className="payment-package-name">Paket</span>
+                  <strong>{latestPayment.packageName || '-'}</strong>
+                </div>
+                <div>
+                  <span className="payment-package-name">Total</span>
+                  <strong>{formatCurrency(latestPayment.amount)}</strong>
+                </div>
+                <div>
+                  <span className="payment-package-name">Atas nama</span>
+                  <strong>{latestPayment.customerName || latestPayment.customerEmail || '-'}</strong>
+                </div>
+              </div>
+
+              <div className="payment-modal-actions payment-card-actions">
+                <button
+                  className="button button-primary"
+                  type="button"
+                  onClick={handleResumePayment}
+                  disabled={paymentStatus.checking || latestPaymentStatus === 'settlement'}
+                >
+                  {latestPaymentStatus === 'settlement' ? 'Sudah Dibayar' : 'Lanjut Bayar'}
+                </button>
+                <button
+                  className="button button-secondary"
+                  type="button"
+                  onClick={handleCheckLatestPaymentStatus}
+                  disabled={paymentStatus.checking}
+                >
+                  {paymentStatus.checking ? 'Memeriksa...' : 'Perbarui Status'}
+                </button>
+              </div>
+            </article>
+          ) : null}
         </section>
 
         <section className="section" id="fitur">
@@ -2099,6 +2547,10 @@ function LandingPage({
         rel="noreferrer"
         aria-label="Chat WhatsApp JOINOURDAY"
       >
+        <span className="floating-whatsapp-text">
+          <span>Butuh bantuan?</span>
+          <span>Chat admin</span>
+        </span>
         <svg
           className="floating-whatsapp-icon"
           viewBox="0 0 32 32"
@@ -2225,11 +2677,57 @@ function LandingPage({
           </div>
         </div>
       ) : null}
+
+      {isSnapModalOpen ? (
+        <div
+          className="payment-modal-overlay payment-snap-overlay"
+          role="presentation"
+          onClick={() => setIsSnapModalOpen(false)}
+        >
+          <div
+            className="payment-modal payment-snap-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="payment-snap-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="payment-modal-header">
+              <div>
+                <span className="auth-user-label">Lanjutkan Pembayaran</span>
+                <h3 id="payment-snap-title">Snap Checkout</h3>
+                <p>
+                  Selesaikan pembayaran untuk order {latestPayment?.orderId || '-'}
+                </p>
+              </div>
+              <button
+                className="payment-modal-close"
+                type="button"
+                aria-label="Tutup modal Snap"
+                onClick={() => setIsSnapModalOpen(false)}
+              >
+                x
+              </button>
+            </div>
+
+            <div className="payment-snap-shell">
+              <div className="payment-snap-summary">
+                <strong>{latestPayment?.packageName || 'Paket'}</strong>
+                <span>{formatCurrency(latestPayment?.amount)}</span>
+              </div>
+              <div id={snapEmbedContainerId} className="payment-snap-container" />
+            </div>
+          </div>
+        </div>
+      ) : null}
+
     </div>
   )
 }
 
 function AdminPage() {
+  const authUser = getStoredSessionAuthUser()
+  const authEmail = String(authUser?.email || '').trim().toLowerCase()
+  const isAuthorizedAdmin = authEmail === ADMIN_EMAIL
   const [isAdminNavOpen, setIsAdminNavOpen] = useState(false)
   const [users, setUsers] = useState([])
   const [paymentLogs, setPaymentLogs] = useState([])
@@ -2244,6 +2742,17 @@ function AdminPage() {
     loadingUserDetail: false,
     error: '',
   })
+
+  useEffect(() => {
+    if (!authUser) {
+      window.location.hash = '#auth'
+      return
+    }
+
+    if (!isAuthorizedAdmin) {
+      window.location.hash = '#beranda'
+    }
+  }, [authUser, isAuthorizedAdmin])
 
   const loadAdminData = async (nextFilters = filters, nextUserId = selectedUserId) => {
     try {
@@ -2281,10 +2790,18 @@ function AdminPage() {
   }
 
   useEffect(() => {
+    if (!isAuthorizedAdmin) {
+      return
+    }
+
     loadAdminData()
-  }, [])
+  }, [isAuthorizedAdmin])
 
   useEffect(() => {
+    if (!isAuthorizedAdmin) {
+      return
+    }
+
     if (!selectedUserId) {
       setSelectedUserDetail(null)
       return
@@ -2321,7 +2838,15 @@ function AdminPage() {
     }
 
     loadUserDetail()
-  }, [selectedUserId])
+  }, [isAuthorizedAdmin, selectedUserId])
+
+  if (!authUser) {
+    return null
+  }
+
+  if (!isAuthorizedAdmin) {
+    return null
+  }
 
   const handleFilterChange = (event) => {
     const { name, value } = event.target
@@ -2645,6 +3170,9 @@ function App() {
   const [activeTab, setActiveTab] = useState('register')
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false)
   const [routeHash, setRouteHash] = useState(() => window.location.hash || '#')
+  const authUser = getStoredSessionAuthUser()
+  const authEmail = String(authUser?.email || '').trim().toLowerCase()
+  const isAuthorizedAdmin = authEmail === ADMIN_EMAIL
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -2660,6 +3188,22 @@ function App() {
     }
   }, [])
 
+  useEffect(() => {
+    if (routeHash !== '#admin') {
+      return
+    }
+
+    if (!authUser) {
+      setActiveTab('login')
+      window.location.hash = '#auth'
+      return
+    }
+
+    if (!isAuthorizedAdmin) {
+      window.location.hash = '#beranda'
+    }
+  }, [authUser, isAuthorizedAdmin, routeHash])
+
   const handleNavClick = () => {
     setIsMobileNavOpen(false)
   }
@@ -2671,7 +3215,7 @@ function App() {
     return <DemoPage theme={selectedTheme} />
   }
 
-  if (routeHash === '#admin') {
+  if (routeHash === '#admin' && isAuthorizedAdmin) {
     return <AdminPage />
   }
 
