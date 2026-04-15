@@ -1365,8 +1365,30 @@
 }
 
 .admin-table-wrap {
+  width: 100%;
+  max-width: 100%;
   overflow-x: auto;
+  overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(177, 135, 98, 0.38) transparent;
+}
+
+.admin-table-wrap::-webkit-scrollbar {
+  height: 8px;
+}
+
+.admin-table-wrap::-webkit-scrollbar-thumb {
+  background: rgba(177, 135, 98, 0.32);
+  border-radius: 999px;
+}
+
+.admin-table-hint {
+  display: none;
+  margin: 0 0 10px;
+  font-size: 0.8rem;
+  color: var(--text-soft);
 }
 
 .admin-table {
@@ -2546,12 +2568,33 @@
     padding: 10px 0;
   }
 
+  .admin-table-wrap {
+    margin-inline: -18px;
+    padding: 0 18px 8px;
+    touch-action: pan-x;
+  }
+
+  .admin-table-hint {
+    display: block;
+    position: sticky;
+    left: 18px;
+  }
+
   .admin-table {
-    min-width: 560px;
+    width: max-content;
+    min-width: 100%;
   }
 
   .admin-table-compact {
-    min-width: 100%;
+    min-width: 420px;
+  }
+
+  .admin-table-users {
+    min-width: 640px;
+  }
+
+  .admin-table-payments {
+    min-width: 860px;
   }
 
   .admin-table-compact th {

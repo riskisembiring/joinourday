@@ -16,7 +16,7 @@ import {
   loginUser,
   registerUser,
 } from './lib/api'
-import { writeAuthLog, writePaymentLog } from './lib/adminLogs'
+import { fetchAuthLogs, writeAuthLog, writePaymentLog } from './lib/adminLogs'
 import './App.css'
 
 const navItems = [
@@ -344,6 +344,10 @@ const formatDateTime = (value) => {
   const date =
     typeof value?.toDate === 'function'
       ? value.toDate()
+      : typeof value === 'object' &&
+          value !== null &&
+          Number.isFinite(value.seconds ?? value._seconds)
+        ? new Date(Number(value.seconds ?? value._seconds) * 1000)
       : value instanceof Date
         ? value
         : new Date(value)
@@ -457,8 +461,60 @@ const normalizeAdminUsers = (payload) =>
     role: item?.role ?? item?.user_type ?? '-',
     createdAt: item?.createdAt ?? item?.created_at ?? item?.registeredAt ?? '',
     updatedAt: item?.updatedAt ?? item?.updated_at ?? '',
-    lastLoginAt: item?.lastLoginAt ?? item?.last_login_at ?? item?.loggedInAt ?? '',
+    lastLoginAt:
+      item?.lastLoginAt ??
+      item?.last_login_at ??
+      item?.loggedInAt ??
+      item?.loginAt ??
+      item?.login_at ??
+      item?.lastSeenAt ??
+      item?.last_seen_at ??
+      item?.lastSeen ??
+      item?.last_seen ??
+      '',
   }))
+
+const normalizeAuthLogs = (payload) =>
+  (Array.isArray(payload) ? payload : []).map((item, index) => ({
+    id: item?.id ?? `auth-log-${index}`,
+    type: item?.type ?? '',
+    userEmail: String(item?.userEmail ?? item?.email ?? '').trim().toLowerCase(),
+    loggedInAt:
+      item?.loggedInAt ??
+      item?.logged_in_at ??
+      item?.loginAt ??
+      item?.login_at ??
+      item?.createdAt ??
+      item?.created_at ??
+      '',
+  }))
+
+const mergeUsersWithLastLogin = (users, authLogs) => {
+  const latestLoginByEmail = new Map()
+
+  normalizeAuthLogs(authLogs).forEach((item) => {
+    if (!item.userEmail || item.type !== 'login' || !item.loggedInAt) {
+      return
+    }
+
+    if (!latestLoginByEmail.has(item.userEmail)) {
+      latestLoginByEmail.set(item.userEmail, item.loggedInAt)
+    }
+  })
+
+  return users.map((user) => {
+    if (user.lastLoginAt) {
+      return user
+    }
+
+    const email = String(user.email || '').trim().toLowerCase()
+
+    return {
+      ...user,
+      lastLoginAt: latestLoginByEmail.get(email) ?? '',
+    }
+  })
+}
 
 const normalizeAdminPayments = (payload) =>
   normalizeCollectionPayload(payload, ['payments', 'transactions', 'results', 'history']).map(
@@ -487,7 +543,17 @@ const normalizeAdminPayments = (payload) =>
       amount: Number(item?.amount ?? item?.grossAmount ?? item?.gross_amount ?? 0),
       paymentStatus:
         item?.paymentStatus ?? item?.status ?? item?.transactionStatus ?? item?.transaction_status ?? '-',
-      createdAt: item?.createdAt ?? item?.created_at ?? '',
+      createdAt:
+        item?.createdAt ??
+        item?.created_at ??
+        item?.transactionTime ??
+        item?.transaction_time ??
+        item?.settlementTime ??
+        item?.settlement_time ??
+        item?.time ??
+        item?.timestamp ??
+        item?.date ??
+        '',
       updatedAt: item?.updatedAt ?? item?.updated_at ?? '',
     }),
   )
@@ -3024,15 +3090,16 @@ function AdminPage() {
         error: '',
       })
 
-      const [usersPayload, paymentsPayload] = await Promise.all([
+      const [usersPayload, paymentsPayload, authLogsPayload] = await Promise.all([
         fetchAdminUsers(),
         fetchAdminPaymentHistory({
           status: nextFilters.status || undefined,
           limit: nextFilters.limit || undefined,
         }),
+        fetchAuthLogs(200).catch(() => []),
       ])
 
-      setUsers(normalizeAdminUsers(usersPayload))
+      setUsers(mergeUsersWithLastLogin(normalizeAdminUsers(usersPayload), authLogsPayload))
       setPaymentLogs(normalizeAdminPayments(paymentsPayload))
       setAdminStatus((current) => ({
         ...current,
@@ -3284,7 +3351,8 @@ function AdminPage() {
               <p className="admin-empty">Memuat data user...</p>
             ) : displayedUsers.length ? (
               <div className="admin-table-wrap">
-                <table className="admin-table">
+                <p className="admin-table-hint">Geser tabel ke samping untuk melihat kolom lainnya.</p>
+                <table className="admin-table admin-table-users">
                   <thead>
                     <tr>
                       <th>User ID</th>
@@ -3332,7 +3400,8 @@ function AdminPage() {
               <p className="admin-empty">Memuat data pembayaran...</p>
             ) : displayedPaymentLogs.length ? (
               <div className="admin-table-wrap">
-                <table className="admin-table">
+                <p className="admin-table-hint">Geser tabel ke samping untuk melihat kolom lainnya.</p>
+                <table className="admin-table admin-table-payments">
                   <thead>
                     <tr>
                       <th>Status</th>
@@ -3389,6 +3458,7 @@ function AdminPage() {
               <p className="admin-empty">Memuat detail user...</p>
             ) : selectedUserDetail ? (
               <div className="admin-table-wrap">
+                <p className="admin-table-hint">Geser tabel ke samping bila isi detail belum terlihat penuh.</p>
                 <table className="admin-table admin-table-compact">
                   <tbody>
                     <tr>
@@ -3413,7 +3483,19 @@ function AdminPage() {
                     </tr>
                     <tr>
                       <th>Last Login</th>
-                      <td data-label="Last Login">{formatDateTime(selectedUserDetail?.lastLoginAt || selectedUserDetail?.last_login_at)}</td>
+                      <td data-label="Last Login">
+                        {formatDateTime(
+                          selectedUserDetail?.lastLoginAt ||
+                            selectedUserDetail?.last_login_at ||
+                            selectedUserDetail?.loggedInAt ||
+                            selectedUserDetail?.loginAt ||
+                            selectedUserDetail?.login_at ||
+                            selectedUserDetail?.lastSeenAt ||
+                            selectedUserDetail?.last_seen_at ||
+                            selectedUserDetail?.lastSeen ||
+                            selectedUserDetail?.last_seen,
+                        )}
+                      </td>
                     </tr>
                   </tbody>
                 </table>
