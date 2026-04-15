@@ -1170,8 +1170,16 @@
   z-index: 45;
 }
 
+.payment-success-overlay {
+  z-index: 46;
+}
+
 .payment-snap-modal {
   width: min(calc(100% - 32px), 390px);
+}
+
+.payment-success-popup {
+  width: min(100%, 520px);
 }
 
 .payment-snap-shell {
@@ -1245,6 +1253,24 @@
 
 .payment-modal-actions {
   align-items: center;
+}
+
+.payment-success-summary {
+  align-items: stretch;
+}
+
+.payment-success-summary > div {
+  display: grid;
+  gap: 6px;
+}
+
+.payment-success-body {
+  padding: 0 2px;
+}
+
+.payment-success-body p {
+  margin: 0;
+  color: var(--text-soft);
 }
 
 .admin-shell {

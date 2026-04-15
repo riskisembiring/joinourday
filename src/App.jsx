@@ -74,8 +74,8 @@ const packages = [
   {
     name: 'Basic',
     code: 'basic',
-    price: 'Rp5.000',
-    amount: 5000,
+    price: 'Rp2.000',
+    amount: 2000,
     description: 'Untuk pasangan yang ingin mulai cepat dengan tampilan tetap elegan.',
     features: ['1 tema pilihan', 'RSVP dasar', 'Countdown acara', 'Share link WhatsApp'],
     featured: false,
@@ -198,6 +198,59 @@ const getStoredLatestPayment = (email) => {
   } catch {
     return null
   }
+}
+
+const getPaymentSuccessSeenStorageKey = (email) => {
+  const normalizedEmail = String(email || '').trim().toLowerCase()
+
+  if (!normalizedEmail) {
+    return ''
+  }
+
+  return `joinourday-payment-success-seen:${normalizedEmail}`
+}
+
+const getStoredSeenPaymentSuccess = (email) => {
+  if (typeof window === 'undefined') {
+    return []
+  }
+
+  const storageKey = getPaymentSuccessSeenStorageKey(email)
+
+  if (!storageKey) {
+    return []
+  }
+
+  const saved = window.localStorage.getItem(storageKey)
+
+  if (!saved) {
+    return []
+  }
+
+  try {
+    const parsed = JSON.parse(saved)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+const persistSeenPaymentSuccess = (email, orderIds) => {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  const storageKey = getPaymentSuccessSeenStorageKey(email)
+
+  if (!storageKey) {
+    return
+  }
+
+  const uniqueOrderIds = Array.from(
+    new Set(orderIds.filter((value) => typeof value === 'string' && value.trim())),
+  )
+
+  window.localStorage.setItem(storageKey, JSON.stringify(uniqueOrderIds))
 }
 
 const normalizeTestimonialItem = (item, index) => {
@@ -328,6 +381,12 @@ const isTerminalPaymentStatus = (value) => {
   return ['settlement', 'capture', 'deny', 'cancel', 'expire', 'failed', 'failure', 'error'].includes(
     status,
   )
+}
+
+const isSuccessfulPaymentStatus = (value) => {
+  const status = normalizePaymentLifecycleStatus(value)
+
+  return status === 'settlement' || status === 'capture'
 }
 
 const getPaymentStatusLabel = (value) => {
@@ -1024,6 +1083,7 @@ function LandingPage({
   })
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
   const [isSnapModalOpen, setIsSnapModalOpen] = useState(false)
+  const [isPaymentSuccessPopupOpen, setIsPaymentSuccessPopupOpen] = useState(false)
   const [paymentForm, setPaymentForm] = useState(() => ({
     customerName: authUser?.name || '',
     email: authUser?.email || '',
@@ -1031,6 +1091,9 @@ function LandingPage({
     notes: '',
   }))
   const [latestPayment, setLatestPayment] = useState(() => getStoredLatestPayment(authUser?.email))
+  const [seenPaymentSuccessOrderIds, setSeenPaymentSuccessOrderIds] = useState(() =>
+    getStoredSeenPaymentSuccess(authUser?.email),
+  )
   const [paymentStatus, setPaymentStatus] = useState({
     submitting: false,
     checking: false,
@@ -1064,6 +1127,25 @@ function LandingPage({
   useEffect(() => {
     setLatestPayment(getStoredLatestPayment(authUser?.email))
   }, [authUser?.email])
+
+  useEffect(() => {
+    setSeenPaymentSuccessOrderIds(getStoredSeenPaymentSuccess(authUser?.email))
+  }, [authUser?.email])
+
+  useEffect(() => {
+    if (!latestPayment?.orderId || !isSuccessfulPaymentStatus(latestPayment.status)) {
+      return
+    }
+
+    if (seenPaymentSuccessOrderIds.includes(latestPayment.orderId)) {
+      return
+    }
+
+    const nextSeenOrderIds = [...seenPaymentSuccessOrderIds, latestPayment.orderId]
+    setSeenPaymentSuccessOrderIds(nextSeenOrderIds)
+    persistSeenPaymentSuccess(authUser?.email, nextSeenOrderIds)
+    setIsPaymentSuccessPopupOpen(true)
+  }, [authUser?.email, latestPayment?.orderId, latestPayment?.status, seenPaymentSuccessOrderIds])
 
   const syncLatestPaymentStatus = async ({
     payment = latestPayment,
@@ -1160,7 +1242,7 @@ function LandingPage({
 
   useEffect(() => {
     const { body } = document
-    const isAnyModalOpen = isPaymentModalOpen || isSnapModalOpen
+    const isAnyModalOpen = isPaymentModalOpen || isSnapModalOpen || isPaymentSuccessPopupOpen
 
     body.style.overflow = isAnyModalOpen ? 'hidden' : ''
 
@@ -1168,6 +1250,7 @@ function LandingPage({
       if (event.key === 'Escape') {
         setIsPaymentModalOpen(false)
         setIsSnapModalOpen(false)
+        setIsPaymentSuccessPopupOpen(false)
       }
     }
 
@@ -1177,7 +1260,7 @@ function LandingPage({
       body.style.overflow = ''
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [isPaymentModalOpen, isSnapModalOpen])
+  }, [isPaymentModalOpen, isPaymentSuccessPopupOpen, isSnapModalOpen])
 
   useEffect(() => {
     if (!latestPayment?.orderId || isTerminalPaymentStatus(latestPayment.status)) {
@@ -2829,6 +2912,71 @@ function LandingPage({
                 <span>{formatCurrency(latestPayment?.amount)}</span>
               </div>
               <div id={snapEmbedContainerId} className="payment-snap-container" />
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isPaymentSuccessPopupOpen ? (
+        <div
+          className="payment-modal-overlay payment-success-overlay"
+          role="presentation"
+          onClick={() => setIsPaymentSuccessPopupOpen(false)}
+        >
+          <div
+            className="payment-modal payment-success-popup"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="payment-success-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="payment-modal-header">
+              <div>
+                <span className="auth-user-label">Pembayaran Berhasil</span>
+                <h3 id="payment-success-title">Transaksi Anda sudah diterima</h3>
+                <p>
+                  Pembayaran untuk order {latestPayment?.orderId || '-'} berhasil diproses.
+                </p>
+              </div>
+              <button
+                className="payment-modal-close"
+                type="button"
+                aria-label="Tutup popup pembayaran berhasil"
+                onClick={() => setIsPaymentSuccessPopupOpen(false)}
+              >
+                x
+              </button>
+            </div>
+
+            <div className="payment-modal-summary payment-success-summary">
+              <div>
+                <span className="auth-user-label">Paket</span>
+                <strong>{latestPayment?.packageName || '-'}</strong>
+              </div>
+              <div>
+                <span className="auth-user-label">Total</span>
+                <strong>{formatCurrency(latestPayment?.amount)}</strong>
+              </div>
+              <div>
+                <span className="auth-user-label">Status</span>
+                <strong>{latestPaymentStatusLabel}</strong>
+              </div>
+            </div>
+
+            <div className="payment-success-body">
+              <p>
+                Terima kasih. Pembayaran sudah berhasil dan data transaksi Anda sudah tersimpan.
+              </p>
+            </div>
+
+            <div className="payment-modal-actions">
+              <button
+                className="button button-primary"
+                type="button"
+                onClick={() => setIsPaymentSuccessPopupOpen(false)}
+              >
+                Tutup
+              </button>
             </div>
           </div>
         </div>
