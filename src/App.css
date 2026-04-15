@@ -690,6 +690,10 @@
   color: var(--text-soft);
 }
 
+.pricing-card li {
+  white-space: nowrap;
+}
+
 .pricing-card li + li,
 .auth-intro li + li {
   margin-top: 12px;
@@ -710,6 +714,7 @@
 .pricing-card .button {
   margin-top: auto;
   align-self: flex-start;
+  white-space: nowrap;
 }
 
 .feature-card {
@@ -2554,7 +2559,7 @@
   .pricing-grid {
     display: grid;
     grid-auto-flow: column;
-    grid-auto-columns: minmax(280px, 86vw);
+    grid-auto-columns: minmax(304px, calc(100vw - 28px));
     gap: 16px;
     overflow-x: auto;
     overscroll-behavior-x: contain;
@@ -2605,11 +2610,24 @@
   }
 
   .payment-card-header,
-  .payment-card-meta,
-  .payment-card-actions {
+  .payment-card-meta {
     grid-template-columns: 1fr;
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .payment-card-actions {
+    flex-direction: row;
+    align-items: center;
+    justify-content: stretch;
+    flex-wrap: nowrap;
+    gap: 12px;
+  }
+
+  .payment-card-actions .button {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-inline: 14px;
   }
 
   .payment-snap-modal {
@@ -2651,11 +2669,31 @@
     border-radius: 24px;
   }
 
-  .payment-modal-header,
-  .payment-modal-summary,
-  .payment-modal-actions {
+  .payment-modal-header {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .payment-modal-header > div {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .payment-modal-close {
+    align-self: flex-start;
+    margin-left: auto;
+  }
+
+  .payment-modal-summary {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .payment-modal-actions {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
   }
 
   .testimonial-rail {

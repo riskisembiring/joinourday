@@ -322,6 +322,14 @@ const normalizePaymentLifecycleStatus = (value) => {
   return normalized || 'pending'
 }
 
+const isTerminalPaymentStatus = (value) => {
+  const status = normalizePaymentLifecycleStatus(value)
+
+  return ['settlement', 'capture', 'deny', 'cancel', 'expire', 'failed', 'failure', 'error'].includes(
+    status,
+  )
+}
+
 const getPaymentStatusLabel = (value) => {
   const status = normalizePaymentLifecycleStatus(value)
 
@@ -1030,6 +1038,7 @@ function LandingPage({
     success: '',
   })
   const latestPaymentAttemptRef = useRef(0)
+  const paymentStatusSyncRef = useRef(false)
   const snapEmbedContainerId = 'joinourday-snap-embed'
 
   const selectedPackage = packages.find((item) => item.code === selectedPackageCode) ?? packages[0]
@@ -1056,6 +1065,99 @@ function LandingPage({
     setLatestPayment(getStoredLatestPayment(authUser?.email))
   }, [authUser?.email])
 
+  const syncLatestPaymentStatus = async ({
+    payment = latestPayment,
+    silent = true,
+    source = 'auto',
+    showChecking = false,
+  } = {}) => {
+    if (!payment?.orderId || paymentStatusSyncRef.current) {
+      return null
+    }
+
+    paymentStatusSyncRef.current = true
+
+    if (showChecking) {
+      setPaymentStatus((current) => ({
+        ...current,
+        checking: true,
+        error: '',
+        success: silent ? current.success : '',
+      }))
+    }
+
+    try {
+      const payload = await fetchMidtransStatus(payment.orderId)
+      const status =
+        payload?.transaction_status ||
+        payload?.status ||
+        payload?.paymentStatus ||
+        payload?.data?.transaction_status ||
+        payload?.data?.status ||
+        payment.status
+
+      const normalizedStatus = normalizePaymentLifecycleStatus(status)
+      const redirectUrl =
+        payload?.redirect_url ||
+        payload?.redirectUrl ||
+        payload?.data?.redirect_url ||
+        payload?.data?.redirectUrl ||
+        payment.redirectUrl ||
+        ''
+
+      const syncedPayment = {
+        ...payment,
+        status: normalizedStatus,
+        redirectUrl,
+      }
+      const previousStatus = normalizePaymentLifecycleStatus(payment.status)
+      const statusChanged = previousStatus !== normalizedStatus
+
+      persistLatestPayment(syncedPayment)
+      setPaymentStatus((current) => ({
+        ...current,
+        checking: false,
+        error: '',
+        success: silent
+          ? current.success
+          : `Status pembayaran order ${payment.orderId}: ${getPaymentStatusLabel(normalizedStatus)}.`,
+      }))
+
+      if (source === 'manual' || statusChanged || isTerminalPaymentStatus(normalizedStatus)) {
+        writePaymentLog({
+          orderId: payment.orderId,
+          type: source === 'manual' ? 'payment_status_checked' : 'payment_status_auto_synced',
+          paymentStatus: normalizedStatus,
+          packageName: payment.packageName || '',
+          amount: payment.amount || 0,
+          customerName: payment.customerName || '',
+          customerEmail: payment.customerEmail || '',
+          customerPhone: payment.customerPhone || '',
+          loggedInUser: authUser?.email || payment.loggedInUser || null,
+          redirectUrl,
+        }).catch(
+          swallowLogError(source === 'manual' ? 'pengecekan status pembayaran' : 'sinkronisasi status pembayaran'),
+        )
+      }
+
+      return syncedPayment
+    } catch (error) {
+      setPaymentStatus((current) => ({
+        ...current,
+        checking: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Gagal memeriksa status pembayaran.',
+        success: silent ? current.success : '',
+      }))
+
+      return null
+    } finally {
+      paymentStatusSyncRef.current = false
+    }
+  }
+
   useEffect(() => {
     const { body } = document
     const isAnyModalOpen = isPaymentModalOpen || isSnapModalOpen
@@ -1076,6 +1178,41 @@ function LandingPage({
       window.removeEventListener('keydown', handleKeyDown)
     }
   }, [isPaymentModalOpen, isSnapModalOpen])
+
+  useEffect(() => {
+    if (!latestPayment?.orderId || isTerminalPaymentStatus(latestPayment.status)) {
+      return undefined
+    }
+
+    syncLatestPaymentStatus({
+      payment: latestPayment,
+      silent: true,
+      source: 'auto',
+    }).catch(() => null)
+
+    const intervalId = window.setInterval(() => {
+      syncLatestPaymentStatus({
+        payment: latestPayment,
+        silent: true,
+        source: 'auto',
+      }).catch(() => null)
+    }, 10000)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [
+    authUser?.email,
+    latestPayment?.amount,
+    latestPayment?.customerEmail,
+    latestPayment?.customerName,
+    latestPayment?.customerPhone,
+    latestPayment?.loggedInUser,
+    latestPayment?.orderId,
+    latestPayment?.packageName,
+    latestPayment?.redirectUrl,
+    latestPayment?.status,
+  ])
 
   useEffect(() => {
     const loadTestimonials = async () => {
@@ -1144,6 +1281,11 @@ function LandingPage({
                 error: '',
                 success: 'Pembayaran berhasil diselesaikan.',
               })
+              syncLatestPaymentStatus({
+                payment: paidPayment,
+                silent: true,
+                source: 'callback',
+              }).catch(() => null)
             },
             onPending: (result) => {
               const pendingPayment = {
@@ -1158,6 +1300,11 @@ function LandingPage({
                 error: '',
                 success: 'Pembayaran masih menunggu penyelesaian.',
               })
+              syncLatestPaymentStatus({
+                payment: pendingPayment,
+                silent: true,
+                source: 'callback',
+              }).catch(() => null)
             },
             onError: () => {
               setPaymentStatus({
@@ -1197,6 +1344,11 @@ function LandingPage({
               error: '',
               success: 'Pembayaran berhasil diselesaikan.',
             })
+            syncLatestPaymentStatus({
+              payment: paidPayment,
+              silent: true,
+              source: 'callback',
+            }).catch(() => null)
           },
           onPending: (result) => {
             const pendingPayment = {
@@ -1211,6 +1363,11 @@ function LandingPage({
               error: '',
               success: 'Pembayaran masih menunggu penyelesaian.',
             })
+            syncLatestPaymentStatus({
+              payment: pendingPayment,
+              silent: true,
+              source: 'callback',
+            }).catch(() => null)
           },
           onError: () => {
             setPaymentStatus({
@@ -1703,6 +1860,12 @@ function LandingPage({
               loggedInUser: authUser?.email || null,
               transactionId: result?.transaction_id || '',
             }).catch(swallowLogError('status pembayaran sukses'))
+
+            syncLatestPaymentStatus({
+              payment: paidPayment,
+              silent: true,
+              source: 'callback',
+            }).catch(() => null)
           },
           onPending: (result) => {
             if (!isLatestPaymentAttempt()) {
@@ -1735,6 +1898,12 @@ function LandingPage({
               loggedInUser: authUser?.email || null,
               transactionId: result?.transaction_id || '',
             }).catch(swallowLogError('status pembayaran pending'))
+
+            syncLatestPaymentStatus({
+              payment: pendingPayment,
+              silent: true,
+              source: 'callback',
+            }).catch(() => null)
           },
           onError: () => {
             if (!isLatestPaymentAttempt()) {
@@ -1873,67 +2042,12 @@ function LandingPage({
       return
     }
 
-    try {
-      setPaymentStatus({
-        submitting: false,
-        checking: true,
-        error: '',
-        success: '',
-      })
-
-      const payload = await fetchMidtransStatus(latestPayment.orderId)
-      const status =
-        payload?.transaction_status ||
-        payload?.status ||
-        payload?.paymentStatus ||
-        payload?.data?.transaction_status ||
-        payload?.data?.status ||
-        latestPayment.status
-
-      const redirectUrl =
-        payload?.redirect_url ||
-        payload?.redirectUrl ||
-        payload?.data?.redirect_url ||
-        payload?.data?.redirectUrl ||
-        latestPayment.redirectUrl ||
-        ''
-
-      const checkedPayment = {
-        ...latestPayment,
-        status: normalizePaymentLifecycleStatus(status),
-        redirectUrl,
-      }
-
-      persistLatestPayment(checkedPayment)
-      setPaymentStatus({
-        submitting: false,
-        checking: false,
-        error: '',
-        success: `Status pembayaran order ${latestPayment.orderId}: ${getPaymentStatusLabel(status)}.`,
-      })
-
-      writePaymentLog({
-        orderId: latestPayment.orderId,
-        type: 'payment_status_checked',
-        paymentStatus: normalizePaymentLifecycleStatus(status),
-        packageName: latestPayment.packageName || '',
-        amount: latestPayment.amount || 0,
-        customerName: latestPayment.customerName || '',
-        customerEmail: latestPayment.customerEmail || '',
-        customerPhone: latestPayment.customerPhone || '',
-        loggedInUser: authUser?.email || latestPayment.loggedInUser || null,
-      }).catch(swallowLogError('pengecekan status pembayaran'))
-    } catch (error) {
-      setPaymentStatus({
-        submitting: false,
-        checking: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : 'Gagal memeriksa status pembayaran.',
-        success: '',
-      })
-    }
+    await syncLatestPaymentStatus({
+      payment: latestPayment,
+      silent: false,
+      source: 'manual',
+      showChecking: true,
+    })
   }
 
   return (
