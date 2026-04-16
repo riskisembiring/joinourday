@@ -1292,12 +1292,6 @@
   padding-bottom: 0;
 }
 
-.admin-note {
-  margin: 12px 0 0;
-  max-width: 760px;
-  color: var(--text-soft);
-}
-
 .admin-toolbar {
   padding: 0 40px;
 }
@@ -1438,6 +1432,40 @@
 .admin-empty {
   margin: 0;
   color: var(--text-soft);
+}
+
+.admin-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+
+.admin-pagination-info,
+.admin-pagination-page {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.88rem;
+}
+
+.admin-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-pagination .button {
+  min-height: 40px;
+  padding-inline: 16px;
+}
+
+.admin-pagination .button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .status-chip {
@@ -2383,6 +2411,10 @@
     padding-top: 92px;
   }
 
+  .admin-main {
+    gap: 18px;
+  }
+
   .topbar {
     padding-top: 20px;
     padding-inline: 20px;
@@ -2516,6 +2548,7 @@
 
   .admin-grid {
     padding: 0 20px 32px;
+    gap: 18px;
   }
 
   .admin-toolbar {
@@ -2555,6 +2588,18 @@
     padding: 16px;
   }
 
+  .admin-filter-form label span {
+    font-size: 0.82rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .admin-filter-form select,
+  .admin-filter-form input,
+  .admin-filter-form .button {
+    min-height: 50px;
+  }
+
   .admin-filter-form .button {
     width: 100%;
   }
@@ -2571,13 +2616,19 @@
   .admin-table-wrap {
     margin-inline: -18px;
     padding: 0 18px 8px;
-    touch-action: pan-x;
+    overflow-x: auto;
+    overflow-y: hidden;
+    touch-action: pan-x pan-y;
   }
 
   .admin-table-hint {
     display: block;
     position: sticky;
     left: 18px;
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+    border: 0;
   }
 
   .admin-table {
@@ -2614,6 +2665,19 @@
 
   .admin-table td::before {
     content: none;
+  }
+
+  .admin-pagination {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-pagination-controls {
+    justify-content: space-between;
+  }
+
+  .admin-pagination-controls .button {
+    flex: 1 1 0;
   }
 
   .theme-content {

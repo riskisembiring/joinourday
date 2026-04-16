@@ -137,6 +137,8 @@ const whatsappLink =
   'https://wa.me/6285270106090?text=%5Bka%5D%20Halo%20joinourday%2C%20saya%20mau%20buat%20undangan%20nih%2C%20mau%20tanya%20dong%20...'
 
 const ADMIN_EMAIL = 'ikiputra876@gmail.com'
+const ADMIN_USERS_PAGE_SIZE = 8
+const ADMIN_PAYMENTS_PAGE_SIZE = 8
 
 const demoSectionIds = ['demo-cover', 'demo-event', 'demo-gallery', 'demo-gift']
 
@@ -3061,6 +3063,8 @@ function AdminPage() {
   const [paymentLogs, setPaymentLogs] = useState([])
   const [selectedUserId, setSelectedUserId] = useState('')
   const [selectedUserDetail, setSelectedUserDetail] = useState(null)
+  const [usersPage, setUsersPage] = useState(1)
+  const [paymentsPage, setPaymentsPage] = useState(1)
   const [filters, setFilters] = useState({
     status: '',
     limit: 20,
@@ -3189,10 +3193,14 @@ function AdminPage() {
     const nextUserId = event.target.value
 
     setSelectedUserId(nextUserId)
+    setUsersPage(1)
+    setPaymentsPage(1)
   }
 
   const handleApplyFilters = (event) => {
     event.preventDefault()
+    setUsersPage(1)
+    setPaymentsPage(1)
     loadAdminData(filters, selectedUserId)
   }
 
@@ -3224,6 +3232,22 @@ function AdminPage() {
 
     return matchesSelectedUser
   })
+
+  const totalUsersPages = Math.max(1, Math.ceil(displayedUsers.length / ADMIN_USERS_PAGE_SIZE))
+  const totalPaymentsPages = Math.max(
+    1,
+    Math.ceil(displayedPaymentLogs.length / ADMIN_PAYMENTS_PAGE_SIZE),
+  )
+  const safeUsersPage = Math.min(usersPage, totalUsersPages)
+  const safePaymentsPage = Math.min(paymentsPage, totalPaymentsPages)
+  const paginatedUsers = displayedUsers.slice(
+    (safeUsersPage - 1) * ADMIN_USERS_PAGE_SIZE,
+    safeUsersPage * ADMIN_USERS_PAGE_SIZE,
+  )
+  const paginatedPaymentLogs = displayedPaymentLogs.slice(
+    (safePaymentsPage - 1) * ADMIN_PAYMENTS_PAGE_SIZE,
+    safePaymentsPage * ADMIN_PAYMENTS_PAGE_SIZE,
+  )
 
   const selectedUserName =
     selectedUserDetail?.nama ||
@@ -3285,12 +3309,7 @@ function AdminPage() {
         <section className="section admin-hero">
           <div className="section-heading reveal">
             <span className="eyebrow">Admin Dashboard</span>
-            <h2>Data user dan history pembayaran dari backend admin.</h2>
-            <p className="admin-note">
-              Halaman ini membaca endpoint admin baru. Pastikan akun yang login membawa token admin
-              agar request `GET /api/auth/admin/users` dan `GET /api/payments/admin/history` tidak
-              ditolak backend.
-            </p>
+            <h2>Data user dan history pembayaran</h2>
           </div>
         </section>
 
@@ -3350,35 +3369,67 @@ function AdminPage() {
             {adminStatus.loading ? (
               <p className="admin-empty">Memuat data user...</p>
             ) : displayedUsers.length ? (
-              <div className="admin-table-wrap">
-                <p className="admin-table-hint">Geser tabel ke samping untuk melihat kolom lainnya.</p>
-                <table className="admin-table admin-table-users">
-                  <thead>
-                    <tr>
-                      <th>User ID</th>
-                      <th>Nama</th>
-                      <th>Email</th>
-                      <th>Role</th>
-                      <th>Last Login</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {displayedUsers.map((item) => (
-                      <tr
-                        key={item.id}
-                        className={selectedUserId === item.id ? 'admin-row-selected' : ''}
-                        onClick={() => setSelectedUserId(item.id)}
-                      >
-                        <td data-label="User ID">{item.id}</td>
-                        <td data-label="Nama">{item.name || '-'}</td>
-                        <td data-label="Email">{item.email || '-'}</td>
-                        <td data-label="Role">{item.role || '-'}</td>
-                        <td data-label="Last Login">{formatDateTime(item.lastLoginAt)}</td>
+              <>
+                <div className="admin-table-wrap">
+                  <p className="admin-table-hint">Geser tabel ke samping untuk melihat kolom lainnya.</p>
+                  <table className="admin-table admin-table-users">
+                    <thead>
+                      <tr>
+                        <th>User ID</th>
+                        <th>Nama</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Last Login</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {paginatedUsers.map((item) => (
+                        <tr
+                          key={item.id}
+                          className={selectedUserId === item.id ? 'admin-row-selected' : ''}
+                          onClick={() => setSelectedUserId(item.id)}
+                        >
+                          <td data-label="User ID">{item.id}</td>
+                          <td data-label="Nama">{item.name || '-'}</td>
+                          <td data-label="Email">{item.email || '-'}</td>
+                          <td data-label="Role">{item.role || '-'}</td>
+                          <td data-label="Last Login">{formatDateTime(item.lastLoginAt)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="admin-pagination">
+                  <p className="admin-pagination-info">
+                    Menampilkan {(safeUsersPage - 1) * ADMIN_USERS_PAGE_SIZE + 1}-
+                    {Math.min(safeUsersPage * ADMIN_USERS_PAGE_SIZE, displayedUsers.length)} dari{' '}
+                    {displayedUsers.length} user
+                  </p>
+                  <div className="admin-pagination-controls">
+                    <button
+                      className="button button-secondary"
+                      type="button"
+                      onClick={() => setUsersPage((current) => Math.max(1, current - 1))}
+                      disabled={safeUsersPage === 1}
+                    >
+                      Sebelumnya
+                    </button>
+                    <span className="admin-pagination-page">
+                      Halaman {safeUsersPage} / {totalUsersPages}
+                    </span>
+                    <button
+                      className="button button-secondary"
+                      type="button"
+                      onClick={() =>
+                        setUsersPage((current) => Math.min(totalUsersPages, current + 1))
+                      }
+                      disabled={safeUsersPage === totalUsersPages}
+                    >
+                      Berikutnya
+                    </button>
+                  </div>
+                </div>
+              </>
             ) : (
               <p className="admin-empty">Tidak ada user yang cocok dengan filter.</p>
             )}
@@ -3399,39 +3450,74 @@ function AdminPage() {
             {adminStatus.loading ? (
               <p className="admin-empty">Memuat data pembayaran...</p>
             ) : displayedPaymentLogs.length ? (
-              <div className="admin-table-wrap">
-                <p className="admin-table-hint">Geser tabel ke samping untuk melihat kolom lainnya.</p>
-                <table className="admin-table admin-table-payments">
-                  <thead>
-                    <tr>
-                      <th>Status</th>
-                      <th>Order ID</th>
-                      <th>Akun Login</th>
-                      <th>Pembeli</th>
-                      <th>Paket</th>
-                      <th>Total</th>
-                      <th>Waktu</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {displayedPaymentLogs.map((item) => (
-                      <tr key={item.id}>
-                        <td data-label="Status">
-                          <span className={`status-chip ${item.paymentStatus || item.type || 'info'}`}>
-                            {item.paymentStatus || item.type || '-'}
-                          </span>
-                        </td>
-                        <td data-label="Order ID">{item.orderId || '-'}</td>
-                        <td data-label="Akun Login">{item.loggedInUser || item.userId || '-'}</td>
-                        <td data-label="Pembeli">{item.customerName || item.customerEmail || '-'}</td>
-                        <td data-label="Paket">{item.packageName || '-'}</td>
-                        <td data-label="Total">{item.amount ? `Rp${item.amount.toLocaleString('id-ID')}` : '-'}</td>
-                        <td data-label="Waktu">{formatDateTime(item.createdAt)}</td>
+              <>
+                <div className="admin-table-wrap">
+                  <p className="admin-table-hint">Geser tabel ke samping untuk melihat kolom lainnya.</p>
+                  <table className="admin-table admin-table-payments">
+                    <thead>
+                      <tr>
+                        <th>Status</th>
+                        <th>Order ID</th>
+                        <th>Akun Login</th>
+                        <th>Pembeli</th>
+                        <th>Paket</th>
+                        <th>Total</th>
+                        <th>Waktu</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {paginatedPaymentLogs.map((item) => (
+                        <tr key={item.id}>
+                          <td data-label="Status">
+                            <span className={`status-chip ${item.paymentStatus || item.type || 'info'}`}>
+                              {item.paymentStatus || item.type || '-'}
+                            </span>
+                          </td>
+                          <td data-label="Order ID">{item.orderId || '-'}</td>
+                          <td data-label="Akun Login">{item.loggedInUser || item.userId || '-'}</td>
+                          <td data-label="Pembeli">{item.customerName || item.customerEmail || '-'}</td>
+                          <td data-label="Paket">{item.packageName || '-'}</td>
+                          <td data-label="Total">{item.amount ? `Rp${item.amount.toLocaleString('id-ID')}` : '-'}</td>
+                          <td data-label="Waktu">{formatDateTime(item.createdAt)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="admin-pagination">
+                  <p className="admin-pagination-info">
+                    Menampilkan {(safePaymentsPage - 1) * ADMIN_PAYMENTS_PAGE_SIZE + 1}-
+                    {Math.min(
+                      safePaymentsPage * ADMIN_PAYMENTS_PAGE_SIZE,
+                      displayedPaymentLogs.length,
+                    )}{' '}
+                    dari {displayedPaymentLogs.length} transaksi
+                  </p>
+                  <div className="admin-pagination-controls">
+                    <button
+                      className="button button-secondary"
+                      type="button"
+                      onClick={() => setPaymentsPage((current) => Math.max(1, current - 1))}
+                      disabled={safePaymentsPage === 1}
+                    >
+                      Sebelumnya
+                    </button>
+                    <span className="admin-pagination-page">
+                      Halaman {safePaymentsPage} / {totalPaymentsPages}
+                    </span>
+                    <button
+                      className="button button-secondary"
+                      type="button"
+                      onClick={() =>
+                        setPaymentsPage((current) => Math.min(totalPaymentsPages, current + 1))
+                      }
+                      disabled={safePaymentsPage === totalPaymentsPages}
+                    >
+                      Berikutnya
+                    </button>
+                  </div>
+                </div>
+              </>
             ) : (
               <p className="admin-empty">Tidak ada history transaksi yang cocok dengan filter.</p>
             )}
