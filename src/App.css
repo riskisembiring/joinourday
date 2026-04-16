@@ -714,7 +714,7 @@
 
 .pricing-card li {
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   line-height: 1.6;
 }
 
@@ -2971,17 +2971,17 @@
 
   .pricing-grid {
     display: grid;
-    grid-auto-flow: row;
-    grid-template-columns: 1fr;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(280px, 100%);
     gap: 16px;
-    overflow: visible;
-    margin-inline: 0;
-    padding-inline: 0;
-    padding-bottom: 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    padding-bottom: 8px;
   }
 
   .pricing-grid::-webkit-scrollbar {
-    display: none;
+    height: 8px;
   }
 
   .pricing-grid::-webkit-scrollbar-thumb {
@@ -2990,38 +2990,25 @@
   }
 
   .pricing-card {
-    min-width: 0;
-    padding: 22px 18px;
-    border-radius: 24px;
+    scroll-snap-align: start;
   }
 
   .pricing-swipe-indicator {
-    display: none;
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 14px;
   }
 
-  .pricing-card h3,
-  .price {
-    overflow-wrap: anywhere;
+  .pricing-swipe-indicator span {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(177, 135, 98, 0.22);
   }
 
-  .pricing-badge {
-    position: static;
-    align-self: flex-start;
-    margin-bottom: 14px;
-  }
-
-  .pricing-kicker,
-  .pricing-ideal,
-  .pricing-card p,
-  .pricing-card li {
-    overflow-wrap: anywhere;
-  }
-
-  .pricing-card .button {
-    width: 100%;
-    align-self: stretch;
-    white-space: normal;
-    text-align: center;
+  .pricing-swipe-indicator span:nth-child(2) {
+    background: rgba(177, 135, 98, 0.42);
   }
 
   .testimonial-rail-head {
