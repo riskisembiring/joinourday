@@ -38,7 +38,7 @@ const themes = [
     date: 'Sabtu, 21 September 2026',
     venue: 'Glasshouse Garden, Jakarta',
     story:
-      'Tema floral lembut untuk pasangan yang ingin tampilan manis, modern, dan penuh detail romantis.',
+      'Tema floral lembut untuk acara yang ingin tampil manis, modern, dan penuh detail elegan.',
     palette: 'Palet dusty rose, cream, dan sentuhan champagne gold.',
     image: demoImageOne,
   },
@@ -64,7 +64,7 @@ const themes = [
     date: 'Sabtu, 08 November 2026',
     venue: 'Serene Hall, Yogyakarta',
     story:
-      'Tema minimalis bersih dengan komposisi editorial yang cocok untuk konsep intimate wedding.',
+      'Tema minimalis bersih dengan komposisi editorial yang cocok untuk berbagai acara intimate.',
     palette: 'Palet soft cream, nude sand, dan blush pastel.',
     image: demoImageThree,
   },
@@ -74,28 +74,79 @@ const packages = [
   {
     name: 'Basic',
     code: 'basic',
-    price: 'Rp2.000',
-    amount: 2000,
-    description: 'Untuk pasangan yang ingin mulai cepat dengan tampilan tetap elegan.',
-    features: ['1 tema pilihan', 'RSVP dasar', 'Countdown acara', 'Share link WhatsApp'],
+    price: 'Rp60.000',
+    amount: 60000,
+    badge: 'Hemat',
+    kicker: 'Mulai simpel, tetap terlihat rapi dan elegan.',
+    description:
+      'Cocok untuk acara sederhana yang butuh undangan digital siap pakai tanpa proses rumit.',
+    idealFor: 'Ideal untuk gathering kecil, syukuran, ulang tahun, atau acara keluarga.',
+    ctaLabel: 'Mulai dari Basic',
+    features: [
+      'Semua fitur Basic',
+      'Tema Standart',
+      'Cover acara dengan nama host atau acara',
+      'Informasi acara utama',
+      'Countdown menuju hari acara',
+      'RSVP dasar untuk konfirmasi tamu',
+      'Share via Link (Manual)',
+    ],
     featured: false,
   },
   {
     name: 'Premium',
     code: 'premium',
-    price: 'Rp80.000',
-    amount: 80000,
-    description: 'Paket paling populer untuk undangan yang lebih personal dan lengkap.',
-    features: ['3 tema premium', 'Galeri foto', 'Musik latar', 'Buku tamu digital', 'Highlight acara'],
+    price: 'Rp100.000',
+    amount: 100000,
+    badge: 'Best Value',
+    kicker: 'Paling seimbang antara harga, tampilan, dan fitur.',
+    description:
+      'Pilihan paling populer untuk penyelenggara yang ingin undangan terasa lebih personal, hangat, dan lengkap.',
+    idealFor: 'Ideal untuk seminar, acara kantor, ulang tahun, atau perayaan yang ingin tampil lebih berkesan.',
+    ctaLabel: 'Pilih Premium',
+    features: [
+      'Semua fitur Basic',
+      'Tema Standart',
+      'Cover acara dengan nama host atau acara',
+      'Informasi acara utama',
+      'Countdown menuju hari acara',
+      'Galeri foto atau dokumentasi acara',
+      'Musik latar otomatis',
+      'Buku tamu digital / ucapan',
+      'Highlight acara dan story singkat',
+      'RSVP dasar untuk konfirmasi tamu',
+      'Tombol share langsung ke WhatsApp'
+    ],
     featured: true,
   },
   {
     name: 'Exclusive',
     code: 'exclusive',
-    price: 'Rp100.000',
-    amount: 100000,
-    description: 'Dirancang untuk pengalaman undangan digital yang lebih mewah dan fleksibel.',
-    features: ['Tema custom', 'Custom domain', 'RSVP lanjutan', 'Story timeline', 'Prioritas revisi'],
+    price: 'Rp150.000',
+    amount: 150000,
+    badge: 'Paling Lengkap',
+    kicker: 'Untuk acara yang membutuhkan tampilan premium dan pengalaman yang lebih personal.',
+    description:
+      'Dirancang untuk kebutuhan acara yang ingin tampil paling mewah, lebih fleksibel, dan punya sentuhan khusus.',
+    idealFor: 'Pilihan tepat untuk Anda yang menginginkan tampilan undangan yang lebih mewah, profesional, dan standout.',
+    ctaLabel: 'Ambil Exclusive',
+    features: [
+      'Semua fitur Premium',
+      'Tampilan lebih eksklusif untuk dibagikan ke tamu',
+      'Cover acara dengan nama host atau acara',
+      'Informasi acara utama',
+      'Countdown menuju hari acara',
+      'Galeri foto atau dokumentasi acara',
+      'Musik latar otomatis',
+      'Buku tamu digital / ucapan',
+      'Highlight acara dan story singkat',
+      'Custom domain / link personal',
+      'RSVP lanjutan dengan detail tamu',
+      'Story timeline acara atau brand',
+      'Prioritas revisi lebih cepat',
+      'Cocok untuk acara besar dengan kebutuhan presentasi lebih premium',
+      'Tombol share langsung ke WhatsApp'
+    ],
     featured: false,
   },
 ]
@@ -2245,7 +2296,7 @@ function LandingPage({
             <span className="eyebrow">Undangan Digital untuk Hari Spesial</span>
             <h1>Buat Undangan Digital Spesialmu dengan JOINOURDAY</h1>
             <p>
-              Platform undangan digital modern untuk pernikahan dan acara istimewa
+              Platform undangan digital modern untuk berbagai kebutuhan acara
               dengan desain elegan, fitur lengkap, dan pengalaman yang mudah untuk
               Anda maupun tamu.
             </p>
@@ -2301,7 +2352,7 @@ function LandingPage({
                     style={{ '--mockup-image': `url(${demoImageTwo})` }}
                   />
                   <div className="mockup-card">
-                    <span>Save The Date</span>
+                    <span>Event Invitation</span>
                     <strong>Jakarta, Indonesia</strong>
                     <p>Desain bersih, modern, dan mudah disesuaikan untuk hari spesial.</p>
                   </div>
@@ -2330,7 +2381,8 @@ function LandingPage({
               <h3>Apa itu JOINOURDAY</h3>
               <p>
                 JOINOURDAY adalah layanan pembuatan undangan digital untuk
-                pernikahan, pertunangan, ulang tahun, dan acara spesial lainnya
+                seminar, ulang tahun, gathering, syukuran, peluncuran produk,
+                dan acara spesial lainnya
                 dengan pendekatan desain modern dan pengalaman pengguna yang rapi.
               </p>
             </article>
@@ -2402,10 +2454,12 @@ function LandingPage({
                 key={item.name}
                 className={`pricing-card reveal${item.featured ? ' featured' : ''}`}
               >
-                {item.featured ? <span className="pricing-badge">Best Value</span> : null}
+                {item.badge ? <span className="pricing-badge">{item.badge}</span> : null}
                 <h3>{item.name}</h3>
+                <p className="pricing-kicker">{item.kicker}</p>
                 <div className="price">{item.price}</div>
                 <p>{item.description}</p>
+                <p className="pricing-ideal">{item.idealFor}</p>
                 <ul>
                   {item.features.map((feature) => (
                     <li key={feature}>{feature}</li>
@@ -2416,7 +2470,7 @@ function LandingPage({
                   type="button"
                   onClick={() => handleSelectPackage(item.code)}
                 >
-                  Pilih Paket
+                  {item.ctaLabel}
                 </button>
               </article>
             ))}
@@ -2729,8 +2783,8 @@ function LandingPage({
             </span>
           </a>
           <p>
-            Solusi undangan digital modern untuk pernikahan dan acara spesial
-            lainnya.
+            Solusi undangan digital modern untuk berbagai acara personal maupun
+            profesional.
           </p>
         </div>
 
@@ -2909,7 +2963,7 @@ function LandingPage({
                 <textarea
                   name="notes"
                   rows="3"
-                  placeholder="Contoh: ingin tema golden untuk akad dan resepsi"
+                  placeholder="Contoh: ingin tema golden untuk gathering kantor atau ulang tahun"
                   value={paymentForm.notes}
                   onChange={handlePaymentInputChange}
                 />
@@ -3260,6 +3314,20 @@ function AdminPage() {
     selectedUserRecord?.email ||
     '-'
 
+  const successfulPaymentsCount = displayedPaymentLogs.filter((item) =>
+    isSuccessfulPaymentStatus(item.paymentStatus),
+  ).length
+  const pendingPaymentsCount = displayedPaymentLogs.filter(
+    (item) => normalizePaymentLifecycleStatus(item.paymentStatus) === 'pending',
+  ).length
+  const totalRevenue = displayedPaymentLogs.reduce((sum, item) => {
+    if (!isSuccessfulPaymentStatus(item.paymentStatus)) {
+      return sum
+    }
+
+    return sum + (Number(item.amount) || 0)
+  }, 0)
+
   return (
     <div className="page-shell admin-shell">
       <header className="topbar">
@@ -3307,54 +3375,101 @@ function AdminPage() {
 
       <main className="admin-main">
         <section className="section admin-hero">
-          <div className="section-heading reveal">
-            <span className="eyebrow">Admin Dashboard</span>
-            <h2>Data user dan history pembayaran</h2>
+          <div className="admin-hero-panel reveal">
+            <div className="admin-hero-copy">
+              <span className="eyebrow">Admin Dashboard</span>
+              <h2>Monitoring user dan transaksi dalam satu tampilan yang lebih rapi.</h2>
+              <p>
+                Ringkasan akun, status pembayaran, dan detail pengguna disusun ulang agar lebih
+                cepat dipindai di desktop maupun mobile.
+              </p>
+            </div>
+
+            <div className="admin-hero-highlight">
+              <span className="admin-hero-highlight-label">User aktif dipilih</span>
+              <strong>{selectedUserId ? selectedUserName : 'Semua user'}</strong>
+              <p>
+                {selectedUserId
+                  ? selectedUserEmail
+                  : `${displayedUsers.length} akun sedang ditampilkan di dashboard.`}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="admin-metrics reveal" aria-label="Ringkasan admin">
+          <article className="admin-metric-card">
+            <span>Total User</span>
+            <strong>{displayedUsers.length}</strong>
+            <p>Akun yang cocok dengan filter aktif.</p>
+          </article>
+          <article className="admin-metric-card admin-metric-card-success">
+            <span>Pembayaran Sukses</span>
+            <strong>{successfulPaymentsCount}</strong>
+            <p>Transaksi dengan status settlement atau capture.</p>
+          </article>
+          <article className="admin-metric-card admin-metric-card-warn">
+            <span>Menunggu Bayar</span>
+            <strong>{pendingPaymentsCount}</strong>
+            <p>Perlu dipantau untuk follow up atau refresh status.</p>
+          </article>
+          <article className="admin-metric-card admin-metric-card-accent">
+            <span>Revenue Terkonfirmasi</span>
+            <strong>{formatCurrency(totalRevenue)}</strong>
+            <p>Total nominal dari transaksi yang sudah berhasil.</p>
+          </article>
+        </section>
+
+        <section className="admin-toolbar">
+          <div className="admin-toolbar-shell">
+            <div className="admin-toolbar-heading">
+              <span className="auth-user-label">Filter Dashboard</span>
+              <h3>Atur data yang ingin ditampilkan</h3>
+              <p>Pilih user, status transaksi, dan jumlah data untuk mempercepat pencarian.</p>
+            </div>
+
+            <form className="admin-filter-form" onSubmit={handleApplyFilters}>
+              <label>
+                <span>User</span>
+                <select name="selectedUserId" value={selectedUserId} onChange={handleSelectedUserChange}>
+                  <option value="">Semua user</option>
+                  {users.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.email}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Status</span>
+                <select name="status" value={filters.status} onChange={handleFilterChange}>
+                  <option value="">Semua status</option>
+                  <option value="pending">pending</option>
+                  <option value="settlement">settlement</option>
+                  <option value="capture">capture</option>
+                  <option value="deny">deny</option>
+                  <option value="cancel">cancel</option>
+                  <option value="expire">expire</option>
+                  <option value="failed">failed</option>
+                </select>
+              </label>
+              <label>
+                <span>Limit</span>
+                <select name="limit" value={filters.limit} onChange={handleFilterChange}>
+                  <option value="10">10</option>
+                  <option value="20">20</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                </select>
+              </label>
+              <button className="button button-primary" type="submit" disabled={adminStatus.loading}>
+                {adminStatus.loading ? 'Memuat...' : 'Terapkan'}
+              </button>
+            </form>
           </div>
         </section>
 
         {adminStatus.error ? <p className="auth-feedback error">{adminStatus.error}</p> : null}
-
-        <section className="admin-toolbar">
-          <form className="admin-filter-form" onSubmit={handleApplyFilters}>
-            <label>
-              <span>User</span>
-              <select name="selectedUserId" value={selectedUserId} onChange={handleSelectedUserChange}>
-                <option value="">Semua user</option>
-                {users.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.email}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>Status</span>
-              <select name="status" value={filters.status} onChange={handleFilterChange}>
-                <option value="">Semua status</option>
-                <option value="pending">pending</option>
-                <option value="settlement">settlement</option>
-                <option value="capture">capture</option>
-                <option value="deny">deny</option>
-                <option value="cancel">cancel</option>
-                <option value="expire">expire</option>
-                <option value="failed">failed</option>
-              </select>
-            </label>
-            <label>
-              <span>Limit</span>
-              <select name="limit" value={filters.limit} onChange={handleFilterChange}>
-                <option value="10">10</option>
-                <option value="20">20</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
-              </select>
-            </label>
-            <button className="button button-primary" type="submit" disabled={adminStatus.loading}>
-              {adminStatus.loading ? 'Memuat...' : 'Terapkan'}
-            </button>
-          </form>
-        </section>
 
         <section className="admin-grid">
           <article className="admin-card">
@@ -3524,7 +3639,7 @@ function AdminPage() {
           </article>
         </section>
 
-        <section className="admin-grid">
+        <section className="admin-grid admin-grid-single">
           <article className="admin-card">
             <div className="admin-card-header">
               <div>
@@ -3606,9 +3721,20 @@ function App() {
 
   useEffect(() => {
     const handleHashChange = () => {
-      setRouteHash(window.location.hash || '#')
+      const nextHash = window.location.hash || '#'
+      const targetId = decodeURIComponent(nextHash.replace(/^#/, ''))
+      const shouldResetScroll =
+        !targetId ||
+        targetId === 'admin' ||
+        targetId.startsWith('demo/') ||
+        !document.getElementById(targetId)
+
+      setRouteHash(nextHash)
       setIsMobileNavOpen(false)
-      window.scrollTo({ top: 0, behavior: 'auto' })
+
+      if (shouldResetScroll) {
+        window.scrollTo({ top: 0, behavior: 'auto' })
+      }
     }
 
     window.addEventListener('hashchange', handleHashChange)
@@ -3634,8 +3760,43 @@ function App() {
     }
   }, [authUser, isAuthorizedAdmin, routeHash])
 
-  const handleNavClick = () => {
+  const navigateToHash = (hash, options = {}) => {
+    const { behavior = 'smooth', fallbackToTop = false } = options
+    const normalizedHash = hash.startsWith('#') ? hash : `#${hash}`
+    const targetId = decodeURIComponent(normalizedHash.replace(/^#/, ''))
+    const targetElement = targetId ? document.getElementById(targetId) : null
+
     setIsMobileNavOpen(false)
+
+    if (window.location.hash !== normalizedHash) {
+      window.history.pushState(null, '', normalizedHash)
+    }
+
+    setRouteHash(normalizedHash)
+
+    if (targetElement) {
+      targetElement.scrollIntoView({ behavior, block: 'start' })
+      return true
+    }
+
+    if (fallbackToTop) {
+      window.scrollTo({ top: 0, behavior })
+      return true
+    }
+
+    return false
+  }
+
+  const handleNavClick = (event) => {
+    const href = event.currentTarget.getAttribute('href') || ''
+
+    if (!href.startsWith('#')) {
+      setIsMobileNavOpen(false)
+      return
+    }
+
+    event.preventDefault()
+    navigateToHash(href)
   }
 
   const demoId = routeHash.startsWith('#demo/') ? routeHash.replace('#demo/', '') : null
